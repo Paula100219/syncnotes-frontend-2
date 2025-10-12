@@ -43,7 +43,7 @@ SyncNotes es una aplicación web para tomar notas, construida con React y Vite. 
 - **ESLint**: Revisión de código para mantenerlo limpio.
 
 ### Archivos Principales
-- **README.md**: Portada del proyecto, explica qué es y cómo usarlo.
+- **TODO.md**: Portada del proyecto, explica qué es y cómo usarlo.
 - **package.json**: Lista de ingredientes (librerías) necesarias.
 - **index.html**: Página base que carga la app.
 - **src/main.jsx**: Punto de inicio de React.
@@ -62,5 +62,4 @@ SyncNotes es una aplicación web para tomar notas, construida con React y Vite. 
 - **Register**: Recoge nombre, usuario y contraseña, crea cuenta, muestra mensaje y va a login.
 
 ### Notas
-- El archivo `authService.js` está vacío y puede eliminarse, ya que la lógica está en las páginas y api.js.
 - El proyecto usa un backend separado para autenticación y datos.

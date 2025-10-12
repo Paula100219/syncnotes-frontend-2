@@ -87,7 +87,6 @@ body{
   display:block !important;
   max-width:100% !important;
 }
-
 .ns-form-scope input::placeholder{ color:#7e8aa5; }
 .ns-form-scope input:focus{
   border-color:transparent !important;
@@ -96,14 +95,10 @@ body{
 
 /* Enlaces dentro del form */
 .ns-form-scope .ns-links-row{
-  display:flex;
-  justify-content:flex-end;
-  margin-top:2px;
+  display:flex; justify-content:flex-end; margin-top:2px;
 }
 .ns-form-scope a{
-  color:#8ab4ff;
-  text-decoration:none;
-  font-size:.9rem;
+  color:#8ab4ff; text-decoration:none; font-size:.9rem;
 }
 .ns-form-scope a:hover{text-decoration:underline;}
 
@@ -139,23 +134,24 @@ body{
   font-size:.92rem;
 }
 
-/* Alertas (éxito / error) */
+/* Alertas (éxito / error) — estilo pulido como en registro */
 .ns-alert{
-  margin-top:.8rem;
-  padding:.65rem .8rem;
+  margin-top:.9rem;
+  padding:.7rem .9rem;
   border-radius:10px;
   font-size:.95rem;
   text-align:center;
   border:1px solid transparent;
+  box-shadow:0 8px 18px rgba(0,0,0,.25);
 }
 .ns-alert--ok{
   background:rgba(34,197,94,.12);
-  border-color:rgba(34,197,94,.35);
-  color:#bbf7d0;
+  border-color:rgba(34,197,94,.38);
+  color:#c7f9d2;
 }
 .ns-alert--err{
-  background:rgba(239,68,68,.12);
-  border-color:rgba(239,68,68,.35);
+  background:rgba(239,68,68,.14);
+  border-color:rgba(239,68,68,.40);
   color:#fecaca;
 }
 
