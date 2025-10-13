@@ -30,7 +30,7 @@ export async function login(username, password) {
   const body = await safeJson(r);
   if (!r.ok) {
     const fallback = await safeText(r);
-    const err = new Error((body && body.message) || fallback || "Contraseña incorrecta");
+    const err = new Error((body && body.message) || fallback || "Login failed");
     err.status = r.status;
     err.data = body;
     throw err;

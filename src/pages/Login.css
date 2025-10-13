@@ -94,12 +94,8 @@ body{
 }
 
 /* Enlaces dentro del form */
-.ns-form-scope .ns-links-row{
-  display:flex; justify-content:flex-end; margin-top:2px;
-}
-.ns-form-scope a{
-  color:#8ab4ff; text-decoration:none; font-size:.9rem;
-}
+.ns-form-scope .ns-links-row{ display:flex; justify-content:flex-end; margin-top:2px; }
+.ns-form-scope a{ color:#8ab4ff; text-decoration:none; font-size:.9rem; }
 .ns-form-scope a:hover{text-decoration:underline;}
 
 /* Botones */
@@ -134,7 +130,7 @@ body{
   font-size:.92rem;
 }
 
-/* Alertas (éxito / error) — estilo pulido como en registro */
+/* Alertas (éxito / error) — banner debajo del formulario */
 .ns-alert{
   margin-top:.9rem;
   padding:.7rem .9rem;
@@ -153,6 +149,18 @@ body{
   background:rgba(239,68,68,.14);
   border-color:rgba(239,68,68,.40);
   color:#fecaca;
+}
+
+/* --- Errores por campo (debajo del label / encima del input) --- */
+.ns-field-error{
+  margin:4px 0 6px;
+  color:#fecaca;
+  font-size:.85rem;
+  line-height:1.2;
+}
+.ns-input--err{
+  border-color: rgba(239,68,68,.55) !important;
+  box-shadow: 0 0 0 3px rgba(239,68,68,.25) !important;
 }
 
 /* Responsive */

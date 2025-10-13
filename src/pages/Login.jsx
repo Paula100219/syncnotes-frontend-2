@@ -7,40 +7,70 @@ import "./login.css";
 
 export default function Login() {
   const [form, setForm] = useState({ username: "", password: "" });
-  const [mensaje, setMensaje] = useState(null); // { tipo:'error'|'ok', texto:string }
-  const [cargando, setCargando] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [message, setMessage] = useState(null); // { type:'error'|'ok', text:string }
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-    if (mensaje) setMensaje(null); // limpia el aviso al teclear
-  };
+  function validate() {
+    var e = {};
+    if (!form.username || !String(form.username).trim()) {
+      e.username = "No has ingresado tus datos.";
+    }
+    if (!form.password || !String(form.password).trim()) {
+      e.password = "No has ingresado tus datos.";
+    }
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  }
 
-  const handleSubmit = async (e) => {
+  function handleChange(evt) {
+    var name = evt.target.name;
+    var value = evt.target.value;
+    setForm(function (f) {
+      return Object.assign({}, f, { [name]: value });
+    });
+    if (errors[name] && value && String(value).trim()) {
+      setErrors(function (prev) {
+        var n = Object.assign({}, prev);
+        delete n[name];
+        return n;
+      });
+    }
+    if (message) setMessage(null);
+  }
+
+  async function handleSubmit(e) {
     e.preventDefault();
-    setMensaje(null);
-    setCargando(true);
+    setMessage(null);
+
+    if (!validate()) return;
+
+    setLoading(true);
     try {
       const token = await login(form.username, form.password);
       console.log("Token guardado:", token);
       navigate("/home");
     } catch (err) {
-      const status = (err && err.status) || (err && err.response && err.response.status);
+      const status =
+        (err && err.status) ||
+        (err && err.response && err.response.status);
+
       const apiMsg =
         (err && err.data && err.data.message) ||
         (err && err.response && err.response.data && err.response.data.message) ||
         err.message;
 
-      const texto =
+      const text =
         status === 401 || status === 403
-          ? apiMsg || "Usuario o contraseña incorrectos."
-          : apiMsg || "No se pudo iniciar sesión. Intenta de nuevo.";
+          ? (apiMsg || "Usuario o contraseña incorrectos.")
+          : (apiMsg || "No se pudo iniciar sesión. Intenta de nuevo.");
 
-      setMensaje({ tipo: "error", texto });
+      setMessage({ type: "error", text: text });
     } finally {
-      setCargando(false);
+      setLoading(false);
     }
-  };
+  }
 
   const fields = [
     { label: "Usuario", type: "text", name: "username", placeholder: "Nombre del usuario" },
@@ -59,7 +89,7 @@ export default function Login() {
           <div className="ns-form-scope" aria-live="polite">
             <AuthForm
               fields={fields}
-              buttonText={cargando ? "Entrando..." : "Iniciar sesión"}
+              buttonText={loading ? "Entrando..." : "Iniciar sesión"}
               onSubmit={handleSubmit}
               formData={form}
               onChange={handleChange}
@@ -67,18 +97,19 @@ export default function Login() {
               linkText="¿No tienes una cuenta?"
               linkTo="/register"
               linkLabel="Regístrate aquí"
+              errors={errors}
             />
 
-            {/* Mensaje de error/éxito debajo del formulario */}
-            {mensaje && mensaje.texto && (
+            {message && message.text ? (
               <div
-                className={`ns-alert ${
-                  mensaje.tipo === "error" ? "ns-alert--err" : "ns-alert--ok"
-                }`}
+                className={
+                  "ns-alert " +
+                  (message.type === "error" ? "ns-alert--err" : "ns-alert--ok")
+                }
               >
-                {mensaje.texto}
+                {message.text}
               </div>
-            )}
+            ) : null}
           </div>
         </section>
       </main>
