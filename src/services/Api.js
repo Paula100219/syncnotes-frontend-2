@@ -30,7 +30,7 @@ export async function login(username, password) {
   const body = await safeJson(r);
   if (!r.ok) {
     const fallback = await safeText(r);
-    const err = new Error((body && body.message) || fallback || "Login failed");
+    const err = new Error((body && (body.error || body.message)) || fallback || "Login failed");
     err.status = r.status;
     err.data = body;
     throw err;
@@ -38,6 +38,7 @@ export async function login(username, password) {
 
   const token = body && body.token;
   setToken(token);
+  // si el backend te devuelve user/rooms/tasks, puedes guardarlos aquí si lo necesitas
   return token;
 }
 
@@ -50,7 +51,7 @@ export async function apiGet(path) {
   const body = await safeJson(r);
   if (!r.ok) {
     const fallback = await safeText(r);
-    const err = new Error((body && body.message) || fallback || "Request failed");
+    const err = new Error((body && (body.error || body.message)) || fallback || "Request failed");
     err.status = r.status;
     err.data = body;
     throw err;
@@ -58,9 +59,12 @@ export async function apiGet(path) {
   return body;
 }
 
-// 🔹 Ejemplos de endpoints de tu backend
+// 🔹 Me: devuelve { user, rooms, tasks, message } desde /api/auth/me
+export const getMe = () => apiGet("/api/auth/me");
+
+// 🔹 Ejemplos de endpoints de tu backend (por si los usas aparte)
 export const getPublicRooms = () => apiGet("/api/rooms/public");
-export const getMyRooms =   () => apiGet("/api/rooms/my-rooms");
+export const getMyRooms    = () => apiGet("/api/rooms/my-rooms");
 
 // 🔹 Obtener mensaje del servidor para test de conexión
 export async function getServerMessage() {
@@ -84,50 +88,10 @@ export async function register(name, username, password) {
   const body = await safeJson(r);
   if (!r.ok) {
     const fallback = await safeText(r);
-    const err = new Error((body && body.message) || fallback || "Register failed");
+    const err = new Error((body && (body.error || body.message)) || fallback || "Register failed");
     err.status = r.status;
     err.data = body;
     throw err;
   }
   return body;
-}
-
-/* ============================================================
-   🔎 Opcional: comprobar si un usuario existe (para afinar el
-   mensaje en el login cuando el backend responde genérico).
-   - Devuelve true  -> el usuario existe
-   - Devuelve false -> el usuario NO existe
-   - Devuelve null  -> no se pudo determinar (endpoint no existe,
-                       CORS, etc). En ese caso no rompas la UI.
-   ============================================================ */
-export async function userExists(username) {
-  try {
-    // Opción A: /api/users/exists?username=...
-    const rA = await fetch(
-      makeUrl("/api/users/exists?username=" + encodeURIComponent(username))
-    );
-    if (rA.ok) {
-      const data = (await safeJson(rA)) || {};
-      if (typeof data.exists === "boolean") return data.exists;
-      if (typeof data.userExists === "boolean") return data.userExists;
-      if (typeof data.found === "boolean") return data.found;
-    } else if (rA.status === 404) {
-      // si el endpoint no existe, probamos la opción B
-    }
-  } catch (e) {
-    // ignoramos y probamos la opción B
-  }
-
-  try {
-    // Opción B: /api/users/:username -> 200 existe, 404 no existe
-    const rB = await fetch(
-      makeUrl("/api/users/" + encodeURIComponent(username))
-    );
-    if (rB.status === 200) return true;
-    if (rB.status === 404) return false;
-  } catch (e) {
-    // ignoramos
-  }
-
-  return null;
 }
