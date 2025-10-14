@@ -40,6 +40,17 @@ export default function Login() {
     if (message) setMessage(null);
   }
 
+  function normalizeMsg(s) {
+    try {
+      return String(s || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase();
+    } catch (_) {
+      return String(s || "").toLowerCase();
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setMessage(null);
@@ -56,17 +67,58 @@ export default function Login() {
         (err && err.status) ||
         (err && err.response && err.response.status);
 
-      const apiMsg =
-        (err && err.data && err.data.message) ||
-        (err && err.response && err.response.data && err.response.data.message) ||
-        err.message;
+      // 👇 TOMAR MENSAJE DEL BACKEND: usa 'error' o 'message'
+      const apiMsgRaw =
+        (err && err.data && (err.data.error || err.data.message)) ||
+        (err && err.response && err.response.data && (err.response.data.error || err.response.data.message)) ||
+        err.message ||
+        "";
 
-      const text =
-        status === 401 || status === 403
-          ? (apiMsg || "Usuario o contraseña incorrectos.")
-          : (apiMsg || "No se pudo iniciar sesión. Intenta de nuevo.");
+      const m = normalizeMsg(apiMsgRaw);
 
-      setMessage({ type: "error", text: text });
+      // Palabras clave
+      const mentionsUser =
+        m.includes("usuario no encontrado") ||
+        m.includes("usuario incorrecto") ||
+        m.includes("user not found") ||
+        m.includes("username not found") ||
+        m.includes("usuario");
+      const mentionsPass =
+        m.includes("contrasena") ||
+        m.includes("contraseña") || // si llega con tilde
+        m.includes("password") ||
+        m.includes("credenciales");
+
+      let text;
+
+      // ── Mapeo claro con base en tu backend ─────────────────────────────
+      if (status === 404) {
+        text = "Usuario no encontrado.";
+      } else if (status === 401 || status === 403) {
+        // Si el backend dijo explícitamente "Usuario no encontrado/incorrecto"
+        if (m.includes("usuario no encontrado") || m.includes("usuario incorrecto")) {
+          text = "Usuario no encontrado.";
+        }
+        // Si dijo explícitamente "Contraseña Incorrecta"
+        else if (m.includes("contrasena incorrecta") || m.includes("contraseña incorrecta") || m.includes("password")) {
+          text = "Contraseña incorrecta.";
+        }
+        // Si mencionó usuario pero no password, tratamos como usuario
+        else if (mentionsUser && !mentionsPass) {
+          text = "Usuario no encontrado.";
+        }
+        // Si no hay pista clara, cae en genérico de credenciales
+        else {
+          text = "Usuario o contraseña incorrectos.";
+        }
+      } else if (status >= 500) {
+        text = apiMsgRaw || "Error en el servidor. Intenta más tarde.";
+      } else {
+        text = apiMsgRaw || "No se pudo iniciar sesión. Intenta de nuevo.";
+      }
+      // ──────────────────────────────────────────────────────────────────
+
+      setMessage({ type: "error", text });
     } finally {
       setLoading(false);
     }

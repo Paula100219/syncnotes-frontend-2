@@ -91,3 +91,43 @@ export async function register(name, username, password) {
   }
   return body;
 }
+
+/* ============================================================
+   🔎 Opcional: comprobar si un usuario existe (para afinar el
+   mensaje en el login cuando el backend responde genérico).
+   - Devuelve true  -> el usuario existe
+   - Devuelve false -> el usuario NO existe
+   - Devuelve null  -> no se pudo determinar (endpoint no existe,
+                       CORS, etc). En ese caso no rompas la UI.
+   ============================================================ */
+export async function userExists(username) {
+  try {
+    // Opción A: /api/users/exists?username=...
+    const rA = await fetch(
+      makeUrl("/api/users/exists?username=" + encodeURIComponent(username))
+    );
+    if (rA.ok) {
+      const data = (await safeJson(rA)) || {};
+      if (typeof data.exists === "boolean") return data.exists;
+      if (typeof data.userExists === "boolean") return data.userExists;
+      if (typeof data.found === "boolean") return data.found;
+    } else if (rA.status === 404) {
+      // si el endpoint no existe, probamos la opción B
+    }
+  } catch (e) {
+    // ignoramos y probamos la opción B
+  }
+
+  try {
+    // Opción B: /api/users/:username -> 200 existe, 404 no existe
+    const rB = await fetch(
+      makeUrl("/api/users/" + encodeURIComponent(username))
+    );
+    if (rB.status === 200) return true;
+    if (rB.status === 404) return false;
+  } catch (e) {
+    // ignoramos
+  }
+
+  return null;
+}
