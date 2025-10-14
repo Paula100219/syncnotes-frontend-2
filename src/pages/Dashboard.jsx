@@ -1,184 +1,361 @@
-// src/pages/Dashboard.jsx
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { getMe } from "../services/api";
+import { useEffect, useMemo, useState } from "react";
+import Navbar from "../components/Navbar";
+import {
+  getMe,
+  createRoom,
+  createTask,
+  getMyRooms,
+} from "../services/api";
 import "./dashboard.css";
 
-const BRAND_NAME = "SyncNotes";
-
 export default function Dashboard() {
-  const navigate = useNavigate();
-  const [me, setMe] = useState(null); // { user, rooms, tasks, message }
   const [loading, setLoading] = useState(true);
+  const [me, setMe] = useState(null); // { user, rooms, tasks }
+  const [error, setError] = useState(null);
 
+  // modales
+  const [openRoomModal, setOpenRoomModal] = useState(false);
+  const [openTaskModal, setOpenTaskModal] = useState(false);
+
+  // forms
+  const [roomForm, setRoomForm] = useState({
+    name: "",
+    description: "",
+    isPublic: false,
+  });
+  const [taskForm, setTaskForm] = useState({
+    roomId: "",
+    title: "",
+    dueDate: "",
+    priority: "MEDIUM",
+  });
+
+  // cargar datos iniciales
   useEffect(() => {
-    let alive = true;
     (async () => {
       try {
-        const data = await getMe(); // requiere token válido
-        if (alive) setMe(data);
+        setLoading(true);
+        const data = await getMe();
+        setMe(data);
+        // por usabilidad: preseleccionar 1ª sala en modal de tarea
+        if (data?.rooms?.length && !taskForm.roomId) {
+          setTaskForm((f) => ({ ...f, roomId: data.rooms[0].id }));
+        }
       } catch (e) {
-        console.error("getMe error:", e);
-        // Si el token ya no sirve, vuelve al login
-        navigate("/login", { replace: true });
+        console.error(e);
+        setError(
+          e?.message || "No se pudo cargar tu información. Intenta nuevamente."
+        );
       } finally {
-        if (alive) setLoading(false);
+        setLoading(false);
       }
     })();
-    return () => {
-      alive = false;
-    };
-  }, [navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+  const userName = me?.user?.name || me?.user?.username || "tu espacio de trabajo";
   const rooms = me?.rooms || [];
   const tasks = me?.tasks || [];
 
+  // HANDLERS ──────────────────────────────────────────────
+  function handleRoomChange(e) {
+    const { name, value, type, checked } = e.target;
+    setRoomForm((f) => ({
+      ...f,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  }
+
+  function handleTaskChange(e) {
+    const { name, value } = e.target;
+    setTaskForm((f) => ({ ...f, [name]: value }));
+  }
+
+  async function submitRoom(e) {
+    e.preventDefault();
+    try {
+      const created = await createRoom(roomForm);
+      // refrescar solo rooms
+      const updatedRooms = await getMyRooms();
+      setMe((prev) => ({ ...prev, rooms: updatedRooms }));
+      setOpenRoomModal(false);
+      setRoomForm({ name: "", description: "", isPublic: false });
+    } catch (err) {
+      alert(
+        (err && (err.data?.error || err.data?.message)) ||
+          err.message ||
+          "No se pudo crear la sala"
+      );
+    }
+  }
+
+  async function submitTask(e) {
+    e.preventDefault();
+    if (!taskForm.roomId) {
+      alert("Selecciona una sala para la tarea.");
+      return;
+    }
+    try {
+      await createTask(taskForm.roomId, {
+        title: taskForm.title,
+        dueDate: taskForm.dueDate || null,
+        priority: taskForm.priority,
+      });
+      // refrescamos /me para obtener tasks consolidadas
+      const data = await getMe();
+      setMe(data);
+      setOpenTaskModal(false);
+      setTaskForm((f) => ({
+        ...f,
+        title: "",
+        dueDate: "",
+        priority: "MEDIUM",
+      }));
+    } catch (err) {
+      alert(
+        (err && (err.data?.error || err.data?.message)) ||
+          err.message ||
+          "No se pudo crear la tarea"
+      );
+    }
+  }
+
+  // formateos simples
+  const pendingTasks = useMemo(
+    () => (tasks || []).filter((t) => !t.completed),
+    [tasks]
+  );
+
   return (
-    <div className="db-root" translate="no">
-      {/* TOP NAV */}
-      <header className="db-topbar" translate="no" aria-label="Barra de navegación">
-        <div className="db-brand" translate="no" onClick={() => navigate("/dashboard")} role="button" tabIndex={0}>
-          <div className="db-logo" aria-hidden>📝</div>
-          <span className="db-brand-text">{BRAND_NAME}</span>
-        </div>
+    <div className="ns-root">
+      <Navbar variant="dashboard" />
 
-        <div className="db-actions" translate="no">
-          <button className="db-btn db-btn-primary" type="button" aria-label="Crear nueva sala">
-            <span className="db-btn-icon">＋</span>
-            <span>Crear nueva sala</span>
-          </button>
+      <main className="dash-main">
+        <header className="dash-header">
+          <h1 className="dash-title">Tu Espacio de Trabajo</h1>
 
-          <button className="db-btn db-btn-ghost" type="button" aria-label="Ver salas públicas">
-            Ver salas públicas
-          </button>
-
-          <div className="db-avatar" aria-label="Menú de usuario" title="Cuenta">
-            <img
-              src="https://i.pravatar.cc/32"
-              alt="avatar"
-              width="32"
-              height="32"
-            />
+          <div className="dash-actions">
+            <button className="btn-primary" onClick={() => setOpenRoomModal(true)}>
+              + Crear nueva sala
+            </button>
+            <button className="btn-ghost">
+              Ver salas públicas
+            </button>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* MAIN */}
-      <main className="db-main" translate="no">
-        <h1 className="db-title" translate="no">Tu Espacio de Trabajo</h1>
+        {loading ? (
+          <div className="dash-loading">Cargando…</div>
+        ) : error ? (
+          <div className="ns-alert ns-alert--err">{error}</div>
+        ) : (
+          <section className="dash-grid">
+            {/* Columna izquierda: salas */}
+            <div className="dash-left">
+              <h2 className="dash-section-title">Mis Salas</h2>
 
-        <div className="db-grid">
-          {/* IZQUIERDA: SALAS */}
-          <section className="db-left" aria-label="Mis salas" translate="no">
-            <h2 className="db-section-title" translate="no">Mis Salas</h2>
-
-            <div className="db-rooms-grid">
-              {loading ? (
-                <div className="db-card db-skeleton" aria-busy="true" />
-              ) : rooms.length > 0 ? (
-                rooms.map((r) => (
-                  <article className="db-card db-room" key={r.id}>
-                    <div className="db-room-header">
-                      <h3 className="db-room-title">{r.name}</h3>
-                      {/* Si tienes un indicador de miembros activos, colócalo aquí */}
+              <div className="rooms-grid">
+                {rooms.length === 0 && (
+                  <div className="room-empty">
+                    <div className="room-empty-icon">👥</div>
+                    <div className="room-empty-title">Aún no tienes salas.</div>
+                    <div className="room-empty-sub">
+                      ¡Crea una para empezar a colaborar!
                     </div>
-                    <p className="db-room-sub">{
-                      (r.members?.length ?? 0) + " miembros"
-                    }</p>
+                  </div>
+                )}
 
-                    <button
-                      className="db-btn db-btn-blue"
-                      type="button"
-                      onClick={() => {
-                        // Navegación a la sala (si existe ruta)
-                        // navigate(`/rooms/${r.id}`);
-                        console.log("Abrir sala:", r.id);
-                      }}
-                    >
-                      Abrir sala
-                    </button>
-                  </article>
-                ))
-              ) : (
-                <article className="db-card db-empty-card">
-                  <div className="db-empty-icon" aria-hidden>👥</div>
-                  <p className="db-empty-title">Aún no tienes salas.</p>
-                  <p className="db-empty-sub">¡Crea una para empezar a colaborar!</p>
-                </article>
-              )}
+                {rooms.map((r) => (
+                  <div key={r.id} className="room-card">
+                    <div className="room-title">{r.name}</div>
+                    <div className="room-sub">
+                      {r.membersCount ?? 0} miembros en línea
+                    </div>
+                    <div className="room-actions">
+                      <button className="btn-secondary">Abrir sala</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
+
+            {/* Columna derecha: tareas */}
+            <aside className="dash-right">
+              <h2 className="dash-section-title">Tus Tareas Pendientes</h2>
+
+              <div className="tasks-panel">
+                {pendingTasks.length === 0 ? (
+                  <div className="tasks-empty">
+                    No tienes tareas pendientes 🧹
+                  </div>
+                ) : (
+                  <ul className="tasks-list">
+                    {pendingTasks.map((t) => (
+                      <li key={t.id} className="task-item">
+                        <div className="task-dot" aria-hidden />
+                        <div className="task-title">{t.title}</div>
+                        <div className="task-badge">
+                          {/* ejemplo simple de badges */}
+                          {t.dueBadge === "TODAY" && (
+                            <span className="badge badge-danger">Vence hoy</span>
+                          )}
+                          {t.dueBadge === "TOMORROW" && (
+                            <span className="badge badge-warning">Vence mañana</span>
+                          )}
+                          {t.completed && (
+                            <span className="badge badge-success">Completada</span>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <button className="btn-panel" onClick={() => setOpenTaskModal(true)}>
+                  + Nueva tarea
+                </button>
+              </div>
+            </aside>
           </section>
+        )}
 
-          {/* DERECHA: TAREAS PENDIENTES */}
-          <aside className="db-right" aria-label="Tus tareas pendientes" translate="no">
-            <h2 className="db-section-title" translate="no">Tus Tareas Pendientes</h2>
-
-            <div className="db-card db-tasks-panel">
-              {loading ? (
-                <ul className="db-tasks-list">
-                  <li className="db-task db-skeleton" aria-busy="true" />
-                  <li className="db-task db-skeleton" aria-busy="true" />
-                </ul>
-              ) : tasks.length > 0 ? (
-                <ul className="db-tasks-list">
-                  {tasks.map((t) => (
-                    <li key={t.id} className={"db-task" + (t.completed ? " is-done" : "")}>
-                      <label className="db-task-row">
-                        <input
-                          type="checkbox"
-                          checked={!!t.completed}
-                          onChange={() => {
-                            // Aquí podrías alternar estado con API
-                            console.log("toggle task", t.id);
-                          }}
-                          aria-label="Completar tarea"
-                        />
-                        <span className="db-task-title">{t.title}</span>
-                        <span className={
-                          "db-badge " +
-                          (t.completed
-                            ? "db-badge-green"
-                            : t.dueTag === "today"
-                            ? "db-badge-red"
-                            : t.dueTag === "tomorrow"
-                            ? "db-badge-yellow"
-                            : "")
-                        }>
-                          {t.completed
-                            ? "Completada"
-                            : t.dueTag === "today"
-                            ? "Vence hoy"
-                            : t.dueTag === "tomorrow"
-                            ? "Vence mañana"
-                            : ""}
-                        </span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <div className="db-empty-tasks" role="status" aria-live="polite">
-                  No tienes tareas pendientes 🎉
-                </div>
-              )}
-
-              <button className="db-btn db-btn-ghost db-btn-block" type="button" aria-label="Nueva tarea">
-                <span className="db-btn-icon">＋</span> Nueva tarea
-              </button>
-            </div>
-          </aside>
-        </div>
+        <footer className="dash-footer">
+          <div>© 2024 SyncNotes. Todos los derechos reservados.</div>
+          <div className="dash-links">
+            <a>Ayuda</a>
+            <a>Contacto</a>
+            <a>Términos de servicio</a>
+          </div>
+        </footer>
       </main>
 
-      {/* FOOTER */}
-      <footer className="db-footer" translate="no">
-        <div>© 2024 {BRAND_NAME}. Todos los derechos reservados.</div>
-        <nav className="db-footer-links" aria-label="Enlaces del pie de página">
-          <a href="#" className="db-footer-link">Ayuda</a>
-          <a href="#" className="db-footer-link">Contacto</a>
-          <a href="#" className="db-footer-link">Términos de servicio</a>
-        </nav>
-      </footer>
+      {/* MODAL: Crear sala */}
+      {openRoomModal && (
+        <div className="ns-modal" role="dialog" aria-modal="true">
+          <div className="ns-modal__card">
+            <h3 className="ns-modal__title">Crear nueva sala</h3>
+            <form onSubmit={submitRoom} className="ns-modal__form">
+              <label className="ns-label">Nombre de la sala</label>
+              <input
+                className="ns-input"
+                name="name"
+                value={roomForm.name}
+                onChange={handleRoomChange}
+                required
+                placeholder="Ej. Diseño de Producto"
+              />
+
+              <label className="ns-label">Descripción (opcional)</label>
+              <textarea
+                className="ns-input ns-textarea"
+                name="description"
+                rows={3}
+                value={roomForm.description}
+                onChange={handleRoomChange}
+                placeholder="Breve descripción"
+              />
+
+              <label className="ns-checkbox">
+                <input
+                  type="checkbox"
+                  name="isPublic"
+                  checked={roomForm.isPublic}
+                  onChange={handleRoomChange}
+                />
+                <span>Hacerla pública</span>
+              </label>
+
+              <div className="ns-modal__actions">
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => setOpenRoomModal(false)}
+                >
+                  Cancelar
+                </button>
+                <button type="submit" className="btn-primary">
+                  Crear
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Nueva tarea */}
+      {openTaskModal && (
+        <div className="ns-modal" role="dialog" aria-modal="true">
+          <div className="ns-modal__card">
+            <h3 className="ns-modal__title">Nueva tarea</h3>
+            <form onSubmit={submitTask} className="ns-modal__form">
+              <label className="ns-label">Título</label>
+              <input
+                className="ns-input"
+                name="title"
+                value={taskForm.title}
+                onChange={handleTaskChange}
+                required
+                placeholder="Ej. Preparar presentación"
+              />
+
+              <div className="ns-grid-2">
+                <div>
+                  <label className="ns-label">Fecha límite</label>
+                  <input
+                    className="ns-input"
+                    type="date"
+                    name="dueDate"
+                    value={taskForm.dueDate}
+                    onChange={handleTaskChange}
+                  />
+                </div>
+                <div>
+                  <label className="ns-label">Prioridad</label>
+                  <select
+                    className="ns-input"
+                    name="priority"
+                    value={taskForm.priority}
+                    onChange={handleTaskChange}
+                  >
+                    <option value="LOW">Baja</option>
+                    <option value="MEDIUM">Media</option>
+                    <option value="HIGH">Alta</option>
+                  </select>
+                </div>
+              </div>
+
+              <label className="ns-label">Sala</label>
+              <select
+                className="ns-input"
+                name="roomId"
+                value={taskForm.roomId}
+                onChange={handleTaskChange}
+                required
+              >
+                <option value="">Selecciona una sala…</option>
+                {rooms.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.name}
+                  </option>
+                ))}
+              </select>
+
+              <div className="ns-modal__actions">
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  onClick={() => setOpenTaskModal(false)}
+                >
+                  Cancelar
+                </button>
+                <button type="submit" className="btn-primary">
+                  Guardar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
