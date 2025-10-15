@@ -1,7 +1,6 @@
-/* Fondo y contenedor principal */
 .dash-main{
   min-height:calc(100dvh - 64px);
-  padding: 32px 20px 24px;
+  padding: 96px 20px 24px; /* antes era 32px — aumentamos el top */
   background:
     radial-gradient(1200px 600px at 70% 20%, rgba(47,128,237,.16), transparent 60%),
     radial-gradient(900px 500px at 20% 80%, rgba(14,165,233,.10), transparent 60%),
