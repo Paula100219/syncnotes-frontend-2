@@ -201,6 +201,11 @@ export async function register(name, username, password) {
   }
   return body;
 }
+// ✅ Eliminar sala
+export function deleteRoom(roomId) {
+  return apiDelete(`/api/rooms/${encodeURIComponent(roomId)}`);
+}
+
 
 // 🔹 (opcional) test conexión
 export async function getServerMessage() {

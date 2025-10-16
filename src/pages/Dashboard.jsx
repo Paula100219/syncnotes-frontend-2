@@ -5,6 +5,7 @@ import {
   createRoom,
   createTask,
   getMyRooms,
+  deleteRoom, // ✅ nueva función
 } from "../services/api";
 import "./dashboard.css";
 
@@ -15,6 +16,9 @@ export default function Dashboard() {
 
   const [openRoomModal, setOpenRoomModal] = useState(false);
   const [openTaskModal, setOpenTaskModal] = useState(false);
+  const [openDeleteModal, setOpenDeleteModal] = useState(false); // ✅ Modal eliminar
+
+  const [roomToDelete, setRoomToDelete] = useState(null); // ✅ sala a eliminar
 
   const [roomForm, setRoomForm] = useState({
     name: "",
@@ -95,6 +99,24 @@ export default function Dashboard() {
     }
   };
 
+  // ✅ Eliminar sala
+  const confirmDeleteRoom = (room) => {
+    setRoomToDelete(room);
+    setOpenDeleteModal(true);
+  };
+
+  const handleDeleteRoom = async () => {
+    try {
+      await deleteRoom(roomToDelete.id);
+      const updatedRooms = await getMyRooms();
+      setMe((prev) => ({ ...prev, rooms: updatedRooms }));
+      setOpenDeleteModal(false);
+      setRoomToDelete(null);
+    } catch (err) {
+      alert(err.message || "No se pudo eliminar la sala");
+    }
+  };
+
   return (
     <div className="ns-root">
       <Navbar
@@ -132,6 +154,12 @@ export default function Dashboard() {
                       <div className="room-sub">{r.membersCount ?? 0} miembros</div>
                       <div className="room-actions">
                         <button className="btn-secondary">Abrir sala</button>
+                        <button
+                          className="btn-ghost"
+                          onClick={() => confirmDeleteRoom(r)}
+                        >
+                          🗑️ Eliminar
+                        </button>
                       </div>
                     </div>
                   ))
@@ -231,20 +259,20 @@ export default function Dashboard() {
                 required
                 placeholder="Ej. Examen de física"
               />
-   <div>
-  <label className="ns-label">Prioridad</label>
-  <select
-    className="ns-input"
-    name="priority"
-    value={taskForm.priority}
-    onChange={handleTaskChange}
-  >
-    <option value="LOW">Baja</option>
-    <option value="MEDIUM">Media</option>
-    <option value="HIGH">Alta</option>
-  </select>
-</div>
 
+              <div>
+                <label className="ns-label">Prioridad</label>
+                <select
+                  className="ns-input"
+                  name="priority"
+                  value={taskForm.priority}
+                  onChange={handleTaskChange}
+                >
+                  <option value="LOW">Baja</option>
+                  <option value="MEDIUM">Media</option>
+                  <option value="HIGH">Alta</option>
+                </select>
+              </div>
 
               <label className="ns-label">Sala</label>
               <select
@@ -275,6 +303,31 @@ export default function Dashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ Modal Confirmar Eliminación */}
+      {openDeleteModal && (
+        <div className="ns-modal">
+          <div className="ns-modal__card">
+            <h3 className="ns-modal__title">Eliminar sala</h3>
+            <p>
+              ¿Seguro que deseas eliminar la sala{" "}
+              <strong>{roomToDelete?.name}</strong>?<br />
+              Esta acción no se puede deshacer.
+            </p>
+            <div className="ns-modal__actions">
+              <button
+                className="btn-ghost"
+                onClick={() => setOpenDeleteModal(false)}
+              >
+                Cancelar
+              </button>
+              <button className="btn-primary" onClick={handleDeleteRoom}>
+                Eliminar
+              </button>
+            </div>
           </div>
         </div>
       )}
