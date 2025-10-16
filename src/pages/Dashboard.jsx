@@ -31,11 +31,14 @@ export default function Dashboard() {
     isPublic: false,
   });
 
+  // 🔹 Formulario de tareas (sin fecha)
   const [taskForm, setTaskForm] = useState({
     title: "",
-    dueDate: "",
     priority: "MEDIUM",
   });
+
+  const [openDeleteModal, setOpenDeleteModal] = useState(false);
+  const [roomToDelete, setRoomToDelete] = useState(null);
 
   const navigate = useNavigate();
 
@@ -89,7 +92,7 @@ export default function Dashboard() {
     }
   };
 
-  // 🔹 Crear o actualizar tarea
+  // 🔹 Crear o actualizar tarea (sin fecha)
   const handleTaskChange = (e) => {
     const { name, value } = e.target;
     setTaskForm((f) => ({ ...f, [name]: value }));
@@ -101,14 +104,11 @@ export default function Dashboard() {
 
     try {
       if (editingTask) {
-        // 🟢 Actualizar tarea existente
         await updateTask(selectedRoom.id, editingTask.id, taskForm);
         alert("Tarea actualizada correctamente");
       } else {
-        // 🆕 Crear nueva tarea
         await createTask(selectedRoom.id, {
           title: taskForm.title,
-          dueDate: taskForm.dueDate || null,
           priority: taskForm.priority,
         });
       }
@@ -117,7 +117,7 @@ export default function Dashboard() {
       setTasks(updatedTasks);
       setOpenTaskModal(false);
       setEditingTask(null);
-      setTaskForm({ title: "", dueDate: "", priority: "MEDIUM" });
+      setTaskForm({ title: "", priority: "MEDIUM" });
     } catch (err) {
       alert(err.message || "No se pudo guardar la tarea");
     }
@@ -139,26 +139,23 @@ export default function Dashboard() {
     }
   };
 
-  // 🔹 Abrir modal para editar tarea
+  // 🔹 Editar tarea
   const handleEditTask = (task) => {
     setEditingTask(task);
     setTaskForm({
       title: task.title,
-      dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "",
       priority: task.priority || "MEDIUM",
     });
     setOpenTaskModal(true);
   };
 
-  // 🔹 Eliminar sala
-  const [openDeleteModal, setOpenDeleteModal] = useState(false);
-  const [roomToDelete, setRoomToDelete] = useState(null);
-
+  // 🔹 Confirmar eliminación de sala
   const confirmDeleteRoom = (room) => {
     setRoomToDelete(room);
     setOpenDeleteModal(true);
   };
 
+  // 🔹 Eliminar sala
   const handleDeleteRoom = async () => {
     try {
       await deleteRoom(roomToDelete.id);
@@ -263,16 +260,8 @@ export default function Dashboard() {
                                 : "#f59e0b",
                           }}
                         />
-                        <div className="task-title">
-                          {t.title}
-                          {t.dueDate && (
-                            <div className="task-date">
-                              <small>
-                                {new Date(t.dueDate).toLocaleDateString()}
-                              </small>
-                            </div>
-                          )}
-                        </div>
+                        <div className="task-title">{t.title}</div>
+
                         <span
                           className={`badge ${
                             t.priority === "HIGH"
@@ -285,7 +274,6 @@ export default function Dashboard() {
                           {t.priority}
                         </span>
 
-                        {/* 🟡 Botones editar / eliminar */}
                         <div className="task-actions">
                           <button
                             className="btn-ghost small"
@@ -309,7 +297,7 @@ export default function Dashboard() {
                     className="btn-panel"
                     onClick={() => {
                       setEditingTask(null);
-                      setTaskForm({ title: "", dueDate: "", priority: "MEDIUM" });
+                      setTaskForm({ title: "", priority: "MEDIUM" });
                       setOpenTaskModal(true);
                     }}
                   >
@@ -321,6 +309,139 @@ export default function Dashboard() {
           </section>
         )}
       </main>
+
+      {/* 🔹 Modal Crear Sala */}
+      {openRoomModal && (
+        <div className="modal-backdrop">
+          <div className="modal">
+            <h2 className="modal-title">Crear nueva sala</h2>
+            <form onSubmit={submitRoom} className="modal-form">
+              <label>
+                Nombre:
+                <input
+                  type="text"
+                  name="name"
+                  value={roomForm.name}
+                  onChange={handleRoomChange}
+                  required
+                />
+              </label>
+
+              <label>
+                Descripción:
+                <textarea
+                  name="description"
+                  value={roomForm.description}
+                  onChange={handleRoomChange}
+                  placeholder="(opcional)"
+                />
+              </label>
+
+              <label className="checkbox">
+                <input
+                  type="checkbox"
+                  name="isPublic"
+                  checked={roomForm.isPublic}
+                  onChange={handleRoomChange}
+                />{" "}
+                Sala pública
+              </label>
+
+              <div className="modal-actions">
+                <button type="submit" className="btn-primary">
+                  Crear
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setOpenRoomModal(false)}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🔹 Modal Crear/Editar Tarea */}
+      {openTaskModal && (
+        <div className="modal-backdrop">
+          <div className="modal">
+            <h2 className="modal-title">
+              {editingTask ? "Editar tarea" : "Nueva tarea"}
+            </h2>
+            <form onSubmit={submitTask} className="modal-form">
+              <label>
+                Título:
+                <input
+                  type="text"
+                  name="title"
+                  value={taskForm.title}
+                  onChange={handleTaskChange}
+                  required
+                  placeholder="Ej. examen de física"
+                />
+              </label>
+
+              <label>
+                Prioridad:
+                <select
+                  name="priority"
+                  value={taskForm.priority}
+                  onChange={handleTaskChange}
+                >
+                  <option value="LOW">Baja</option>
+                  <option value="MEDIUM">Media</option>
+                  <option value="HIGH">Alta</option>
+                </select>
+              </label>
+
+              <div className="modal-actions">
+                <button type="submit" className="btn-primary">
+                  Guardar
+                </button>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setOpenTaskModal(false)}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 🔹 Modal Eliminar Sala */}
+      {openDeleteModal && (
+        <div className="modal-backdrop">
+          <div className="modal">
+            <h2 className="modal-title">Eliminar sala</h2>
+            <p
+              style={{
+                textAlign: "center",
+                color: "#a8b3c7",
+                marginBottom: "14px",
+              }}
+            >
+              ¿Seguro que quieres eliminar <strong>{roomToDelete?.name}</strong>?
+            </p>
+            <div className="modal-actions">
+              <button
+                className="btn-ghost"
+                onClick={() => setOpenDeleteModal(false)}
+              >
+                Cancelar
+              </button>
+              <button className="btn-primary" onClick={handleDeleteRoom}>
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
