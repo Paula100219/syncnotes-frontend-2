@@ -1,5 +1,6 @@
 import styled from "styled-components";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
 import logoPng from "../assets/logo.png";
 
 const Nav = styled.nav`
@@ -39,6 +40,7 @@ const Right = styled.div`
   display: flex;
   align-items: center;
   gap: 0.8rem;
+  position: relative;
 `;
 
 const Button = styled.button`
@@ -88,6 +90,44 @@ const Avatar = styled.img`
   object-fit: cover;
   cursor: pointer;
   border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+
+  &:hover {
+    transform: scale(1.05);
+    border-color: rgba(255, 255, 255, 0.6);
+  }
+`;
+
+// 🔹 Estilos del menú desplegable
+const Dropdown = styled.div`
+  position: absolute;
+  top: 56px;
+  right: 0;
+  background: rgba(28, 36, 56, 0.96);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  z-index: 999;
+  animation: fadeIn 0.15s ease;
+`;
+
+const DropItem = styled.button`
+  background: none;
+  border: none;
+  color: #f1f1f1;
+  text-align: left;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
 `;
 
 export default function Navbar({
@@ -95,6 +135,26 @@ export default function Navbar({
   onCreateRoom,
   onViewPublicRooms,
 }) {
+  const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  // 🔹 Cerrar menú al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    navigate("/login");
+  };
+
   if (variant === "dashboard") {
     return (
       <Nav>
@@ -103,18 +163,39 @@ export default function Navbar({
           <BrandText>SyncNotes</BrandText>
         </Left>
 
-        <Right>
+        <Right ref={menuRef}>
           <Button variant="primary" onClick={onCreateRoom}>
             + Crear nueva sala
           </Button>
+
+          <Button onClick={() => navigate("/chat")}>💬 Ir al chat</Button>
+
           <Button onClick={onViewPublicRooms}>Ver salas públicas</Button>
           <IconButton title="Notificaciones">🔔</IconButton>
-          <Avatar src="https://i.pravatar.cc/36" alt="perfil" />
+
+          {/* 🔹 Avatar con menú desplegable */}
+          <div style={{ position: "relative" }}>
+            <Avatar
+              src="https://i.pravatar.cc/36"
+              alt="perfil"
+              onClick={() => setMenuOpen(!menuOpen)}
+            />
+            {menuOpen && (
+              <Dropdown>
+                <DropItem onClick={() => navigate("/perfil")}>👤 Perfil</DropItem>
+                <DropItem onClick={() => navigate("/actualizar")}>
+                  ⚙️ Actualizar usuario
+                </DropItem>
+                <DropItem onClick={handleLogout}>🚪 Cerrar sesión</DropItem>
+              </Dropdown>
+            )}
+          </div>
         </Right>
       </Nav>
     );
   }
 
+  // versión pública
   return (
     <Nav>
       <Left>

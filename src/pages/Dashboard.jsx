@@ -1,11 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import {
   getMe,
+  getMyRooms,
+  getRoomTasks,
   createRoom,
   createTask,
-  getMyRooms,
-  deleteRoom, // ✅ nueva función
+  deleteRoom,
+  updateTask,
+  deleteTask,
 } from "../services/api";
 import "./dashboard.css";
 
@@ -14,11 +18,12 @@ export default function Dashboard() {
   const [me, setMe] = useState(null);
   const [error, setError] = useState(null);
 
+  const [selectedRoom, setSelectedRoom] = useState(null);
+  const [tasks, setTasks] = useState([]);
+
   const [openRoomModal, setOpenRoomModal] = useState(false);
   const [openTaskModal, setOpenTaskModal] = useState(false);
-  const [openDeleteModal, setOpenDeleteModal] = useState(false); // ✅ Modal eliminar
-
-  const [roomToDelete, setRoomToDelete] = useState(null); // ✅ sala a eliminar
+  const [editingTask, setEditingTask] = useState(null);
 
   const [roomForm, setRoomForm] = useState({
     name: "",
@@ -27,21 +32,20 @@ export default function Dashboard() {
   });
 
   const [taskForm, setTaskForm] = useState({
-    roomId: "",
     title: "",
     dueDate: "",
     priority: "MEDIUM",
   });
 
+  const navigate = useNavigate();
+
+  // 🔹 Cargar usuario
   useEffect(() => {
     (async () => {
       try {
         setLoading(true);
         const data = await getMe();
         setMe(data);
-        if (data?.rooms?.length && !taskForm.roomId) {
-          setTaskForm((f) => ({ ...f, roomId: data.rooms[0].id }));
-        }
       } catch (e) {
         setError(e?.message || "No se pudo cargar tu información.");
       } finally {
@@ -51,21 +55,25 @@ export default function Dashboard() {
   }, []);
 
   const rooms = me?.rooms || [];
-  const tasks = me?.tasks || [];
 
-  const pendingTasks = useMemo(
-    () => tasks.filter((t) => !t.completed),
-    [tasks]
-  );
+  // 🔹 Cargar tareas de una sala
+  const handleOpenRoom = async (room) => {
+    setSelectedRoom(room);
+    try {
+      setLoading(true);
+      const roomTasks = await getRoomTasks(room.id);
+      setTasks(roomTasks);
+    } catch {
+      alert("No se pudieron cargar las tareas de esta sala");
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  // 🔹 Crear sala
   const handleRoomChange = (e) => {
     const { name, value, type, checked } = e.target;
     setRoomForm((f) => ({ ...f, [name]: type === "checkbox" ? checked : value }));
-  };
-
-  const handleTaskChange = (e) => {
-    const { name, value } = e.target;
-    setTaskForm((f) => ({ ...f, [name]: value }));
   };
 
   const submitRoom = async (e) => {
@@ -81,25 +89,71 @@ export default function Dashboard() {
     }
   };
 
+  // 🔹 Crear o actualizar tarea
+  const handleTaskChange = (e) => {
+    const { name, value } = e.target;
+    setTaskForm((f) => ({ ...f, [name]: value }));
+  };
+
   const submitTask = async (e) => {
     e.preventDefault();
-    if (!taskForm.roomId) return alert("Selecciona una sala.");
+    if (!selectedRoom) return alert("Primero selecciona una sala.");
+
     try {
-      await createTask(taskForm.roomId, {
-        title: taskForm.title,
-        dueDate: taskForm.dueDate || null,
-        priority: taskForm.priority,
-      });
-      const data = await getMe();
-      setMe(data);
+      if (editingTask) {
+        // 🟢 Actualizar tarea existente
+        await updateTask(selectedRoom.id, editingTask.id, taskForm);
+        alert("Tarea actualizada correctamente");
+      } else {
+        // 🆕 Crear nueva tarea
+        await createTask(selectedRoom.id, {
+          title: taskForm.title,
+          dueDate: taskForm.dueDate || null,
+          priority: taskForm.priority,
+        });
+      }
+
+      const updatedTasks = await getRoomTasks(selectedRoom.id);
+      setTasks(updatedTasks);
       setOpenTaskModal(false);
-      setTaskForm({ ...taskForm, title: "", dueDate: "" });
+      setEditingTask(null);
+      setTaskForm({ title: "", dueDate: "", priority: "MEDIUM" });
     } catch (err) {
-      alert(err.message || "No se pudo crear la tarea");
+      alert(err.message || "No se pudo guardar la tarea");
     }
   };
 
-  // ✅ Eliminar sala
+  // 🔹 Eliminar tarea
+  const handleDeleteTask = async (task) => {
+    if (!selectedRoom) return;
+    const ok = confirm(`¿Eliminar la tarea "${task.title}"?`);
+    if (!ok) return;
+
+    try {
+      await deleteTask(selectedRoom.id, task.id);
+      const updatedTasks = await getRoomTasks(selectedRoom.id);
+      setTasks(updatedTasks);
+      alert("Tarea eliminada correctamente");
+    } catch (err) {
+      alert(err.message || "No se pudo eliminar la tarea");
+    }
+  };
+
+  // 🔹 Abrir modal para editar tarea
+  const handleEditTask = (task) => {
+    setEditingTask(task);
+    setTaskForm({
+      title: task.title,
+      dueDate: task.dueDate ? task.dueDate.slice(0, 10) : "",
+      priority: task.priority || "MEDIUM",
+    });
+    setOpenTaskModal(true);
+  };
+
+  // 🔹 Eliminar sala
+  const [openDeleteModal, setOpenDeleteModal] = useState(false);
+  const [roomToDelete, setRoomToDelete] = useState(null);
+
   const confirmDeleteRoom = (room) => {
     setRoomToDelete(room);
     setOpenDeleteModal(true);
@@ -110,6 +164,10 @@ export default function Dashboard() {
       await deleteRoom(roomToDelete.id);
       const updatedRooms = await getMyRooms();
       setMe((prev) => ({ ...prev, rooms: updatedRooms }));
+      if (selectedRoom?.id === roomToDelete.id) {
+        setSelectedRoom(null);
+        setTasks([]);
+      }
       setOpenDeleteModal(false);
       setRoomToDelete(null);
     } catch (err) {
@@ -136,6 +194,7 @@ export default function Dashboard() {
           <div className="ns-alert ns-alert--err">{error}</div>
         ) : (
           <section className="dash-grid">
+            {/* 🟦 Salas */}
             <div className="dash-left">
               <h2 className="dash-section-title">Mis Salas</h2>
               <div className="rooms-grid">
@@ -151,9 +210,16 @@ export default function Dashboard() {
                   rooms.map((r) => (
                     <div key={r.id} className="room-card">
                       <div className="room-title">{r.name}</div>
-                      <div className="room-sub">{r.membersCount ?? 0} miembros</div>
+                      <div className="room-sub">
+                        {r.membersCount ?? 0} miembros
+                      </div>
                       <div className="room-actions">
-                        <button className="btn-secondary">Abrir sala</button>
+                        <button
+                          className="btn-secondary"
+                          onClick={() => handleOpenRoom(r)}
+                        >
+                          Abrir sala
+                        </button>
                         <button
                           className="btn-ghost"
                           onClick={() => confirmDeleteRoom(r)}
@@ -167,170 +233,94 @@ export default function Dashboard() {
               </div>
             </div>
 
+            {/* 🟩 Panel de tareas */}
             <aside className="dash-right">
-              <h2 className="dash-section-title">Tus Tareas Pendientes</h2>
+              <h2 className="dash-section-title">
+                {selectedRoom
+                  ? `Tareas de ${selectedRoom.name}`
+                  : "Selecciona una sala"}
+              </h2>
+
               <div className="tasks-panel">
-                {pendingTasks.length === 0 ? (
-                  <div className="tasks-empty">No tienes tareas pendientes 🧹</div>
+                {!selectedRoom ? (
+                  <div className="tasks-empty">
+                    Selecciona una sala para ver sus tareas
+                  </div>
+                ) : tasks.length === 0 ? (
+                  <div className="tasks-empty">No hay tareas en esta sala 🧹</div>
                 ) : (
                   <ul className="tasks-list">
-                    {pendingTasks.map((t) => (
+                    {tasks.map((t) => (
                       <li key={t.id} className="task-item">
-                        <div className="task-dot" />
-                        <div className="task-title">{t.title}</div>
+                        <div
+                          className="task-dot"
+                          style={{
+                            background:
+                              t.priority === "HIGH"
+                                ? "#ef4444"
+                                : t.priority === "LOW"
+                                ? "#22c55e"
+                                : "#f59e0b",
+                          }}
+                        />
+                        <div className="task-title">
+                          {t.title}
+                          {t.dueDate && (
+                            <div className="task-date">
+                              <small>
+                                {new Date(t.dueDate).toLocaleDateString()}
+                              </small>
+                            </div>
+                          )}
+                        </div>
+                        <span
+                          className={`badge ${
+                            t.priority === "HIGH"
+                              ? "badge-danger"
+                              : t.priority === "LOW"
+                              ? "badge-success"
+                              : "badge-warning"
+                          }`}
+                        >
+                          {t.priority}
+                        </span>
+
+                        {/* 🟡 Botones editar / eliminar */}
+                        <div className="task-actions">
+                          <button
+                            className="btn-ghost small"
+                            onClick={() => handleEditTask(t)}
+                          >
+                            ✏️
+                          </button>
+                          <button
+                            className="btn-ghost small"
+                            onClick={() => handleDeleteTask(t)}
+                          >
+                            🗑️
+                          </button>
+                        </div>
                       </li>
                     ))}
                   </ul>
                 )}
-                <button className="btn-panel" onClick={() => setOpenTaskModal(true)}>
-                  + Nueva tarea
-                </button>
+                {selectedRoom && (
+                  <button
+                    className="btn-panel"
+                    onClick={() => {
+                      setEditingTask(null);
+                      setTaskForm({ title: "", dueDate: "", priority: "MEDIUM" });
+                      setOpenTaskModal(true);
+                    }}
+                  >
+                    + Nueva tarea
+                  </button>
+                )}
               </div>
             </aside>
           </section>
         )}
       </main>
-
-      {/* Modal Crear Sala */}
-      {openRoomModal && (
-        <div className="ns-modal">
-          <div className="ns-modal__card">
-            <h3 className="ns-modal__title">Crear nueva sala</h3>
-            <form onSubmit={submitRoom} className="ns-modal__form">
-              <label className="ns-label">Nombre de la sala</label>
-              <input
-                className="ns-input"
-                name="name"
-                value={roomForm.name}
-                onChange={handleRoomChange}
-                required
-                placeholder="Ej. Diseño de Producto"
-              />
-
-              <label className="ns-label">Descripción (opcional)</label>
-              <textarea
-                className="ns-input ns-textarea"
-                name="description"
-                rows={3}
-                value={roomForm.description}
-                onChange={handleRoomChange}
-                placeholder="Breve descripción"
-              />
-
-              <label className="ns-checkbox">
-                <input
-                  type="checkbox"
-                  name="isPublic"
-                  checked={roomForm.isPublic}
-                  onChange={handleRoomChange}
-                />
-                <span>Hacerla pública</span>
-              </label>
-
-              <div className="ns-modal__actions">
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  onClick={() => setOpenRoomModal(false)}
-                >
-                  Cancelar
-                </button>
-                <button type="submit" className="btn-primary">
-                  Crear
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Nueva Tarea */}
-      {openTaskModal && (
-        <div className="ns-modal">
-          <div className="ns-modal__card">
-            <h3 className="ns-modal__title">Nueva tarea</h3>
-            <form onSubmit={submitTask} className="ns-modal__form">
-              <label className="ns-label">Título</label>
-              <input
-                className="ns-input"
-                name="title"
-                value={taskForm.title}
-                onChange={handleTaskChange}
-                required
-                placeholder="Ej. Examen de física"
-              />
-
-              <div>
-                <label className="ns-label">Prioridad</label>
-                <select
-                  className="ns-input"
-                  name="priority"
-                  value={taskForm.priority}
-                  onChange={handleTaskChange}
-                >
-                  <option value="LOW">Baja</option>
-                  <option value="MEDIUM">Media</option>
-                  <option value="HIGH">Alta</option>
-                </select>
-              </div>
-
-              <label className="ns-label">Sala</label>
-              <select
-                className="ns-input"
-                name="roomId"
-                value={taskForm.roomId}
-                onChange={handleTaskChange}
-                required
-              >
-                <option value="">Selecciona una sala...</option>
-                {rooms.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
-
-              <div className="ns-modal__actions">
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  onClick={() => setOpenTaskModal(false)}
-                >
-                  Cancelar
-                </button>
-                <button type="submit" className="btn-primary">
-                  Guardar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ✅ Modal Confirmar Eliminación */}
-      {openDeleteModal && (
-        <div className="ns-modal">
-          <div className="ns-modal__card">
-            <h3 className="ns-modal__title">Eliminar sala</h3>
-            <p>
-              ¿Seguro que deseas eliminar la sala{" "}
-              <strong>{roomToDelete?.name}</strong>?<br />
-              Esta acción no se puede deshacer.
-            </p>
-            <div className="ns-modal__actions">
-              <button
-                className="btn-ghost"
-                onClick={() => setOpenDeleteModal(false)}
-              >
-                Cancelar
-              </button>
-              <button className="btn-primary" onClick={handleDeleteRoom}>
-                Eliminar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
