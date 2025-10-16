@@ -90,7 +90,11 @@ const Avatar = styled.img`
   border: 1px solid rgba(255, 255, 255, 0.2);
 `;
 
-export default function Navbar({ variant = "login" }) {
+export default function Navbar({
+  variant = "login",
+  onCreateRoom,
+  onViewPublicRooms,
+}) {
   if (variant === "dashboard") {
     return (
       <Nav>
@@ -100,8 +104,10 @@ export default function Navbar({ variant = "login" }) {
         </Left>
 
         <Right>
-          <Button variant="primary">+ Crear nueva sala</Button>
-          <Button>Ver salas públicas</Button>
+          <Button variant="primary" onClick={onCreateRoom}>
+            + Crear nueva sala
+          </Button>
+          <Button onClick={onViewPublicRooms}>Ver salas públicas</Button>
           <IconButton title="Notificaciones">🔔</IconButton>
           <Avatar src="https://i.pravatar.cc/36" alt="perfil" />
         </Right>
@@ -109,7 +115,6 @@ export default function Navbar({ variant = "login" }) {
     );
   }
 
-  // versión pública (login, register, landing)
   return (
     <Nav>
       <Left>
