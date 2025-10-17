@@ -53,10 +53,10 @@ export default function Login() {
     setLoading(true);
     try {
       const body = await login(form.username, form.password);
-      // guarda nombre/usuario (ya lo hace api.js, pero por si acaso)
-      if (body?.user?.username) {
-        localStorage.setItem("username", body.user.username);
-        localStorage.setItem("name", body.user.name || body.user.username);
+      // guarda nombre/username (ya lo hace api.js, pero por si acaso)
+      if (body?.username) {
+        localStorage.setItem("username", body.username);
+        localStorage.setItem("name", body.name || body.username);
       }
       navigate("/dashboard"); // ⬅️ al dashboard
     } catch (err) {
@@ -94,7 +94,7 @@ export default function Login() {
   }
 
   const fields = [
-    { label: "Usuario", type: "text", name: "username", placeholder: "nombre.usuario" },
+    { label: "Username", type: "text", name: "username", placeholder: "usuario" },
     { label: "Contraseña", type: "password", name: "password", placeholder: "" },
   ];
 

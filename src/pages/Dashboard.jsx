@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import {
   getMe,
@@ -10,6 +9,10 @@ import {
   deleteRoom,
   updateTask,
   deleteTask,
+  getRoomDetails,
+  addMember,
+  updateMemberRole,
+  searchUser,
 } from "../services/api";
 import "./dashboard.css";
 
@@ -22,8 +25,7 @@ export default function Dashboard() {
   const [tasks, setTasks] = useState([]);
 
   const [openRoomModal, setOpenRoomModal] = useState(false);
-  const [openTaskModal, setOpenTaskModal] = useState(false);
-  const [editingTask, setEditingTask] = useState(null);
+   const [openTaskModal, setOpenTaskModal] = useState(false);
 
   const [roomForm, setRoomForm] = useState({
     name: "",
@@ -31,16 +33,28 @@ export default function Dashboard() {
     isPublic: false,
   });
 
-  // 🔹 Formulario de tareas (sin fecha)
-  const [taskForm, setTaskForm] = useState({
-    title: "",
-    priority: "MEDIUM",
-  });
+    // 🔹 Formulario de tareas
+    const [taskForm, setTaskForm] = useState({
+      title: "",
+      description: "",
+      priority: "MEDIUM",
+      dueDate: "",
+      assignedTo: "",
+    });
 
-  const [openDeleteModal, setOpenDeleteModal] = useState(false);
-  const [roomToDelete, setRoomToDelete] = useState(null);
+   const [openDeleteModal, setOpenDeleteModal] = useState(false);
+   const [roomToDelete, setRoomToDelete] = useState(null);
 
-  const navigate = useNavigate();
+   const [openDeleteTaskModal, setOpenDeleteTaskModal] = useState(false);
+   const [taskToDelete, setTaskToDelete] = useState(null);
+
+      const [openAddMemberModal, setOpenAddMemberModal] = useState(false);
+      const [searchMode, setSearchMode] = useState("username"); // "username" or "id"
+      const [usernameInput, setUsernameInput] = useState("");
+      const [userIdSeleccionado, setUserIdSeleccionado] = useState("");
+      const [message, setMessage] = useState("");
+      const [searching, setSearching] = useState(false);
+      const [adding, setAdding] = useState(false);
 
   // 🔹 Cargar usuario
   useEffect(() => {
@@ -57,6 +71,8 @@ export default function Dashboard() {
     })();
   }, []);
 
+
+
   const rooms = me?.rooms || [];
 
   // 🔹 Cargar tareas de una sala
@@ -64,10 +80,14 @@ export default function Dashboard() {
     setSelectedRoom(room);
     try {
       setLoading(true);
-      const roomTasks = await getRoomTasks(room.id);
+      const [roomTasks, roomDetails] = await Promise.all([
+        getRoomTasks(room.id),
+        getRoomDetails(room.id),
+      ]);
       setTasks(roomTasks);
+      setSelectedRoom(roomDetails); // actualizar con detalles completos
     } catch {
-      alert("No se pudieron cargar las tareas de esta sala");
+      alert("No se pudieron cargar los datos de la sala");
     } finally {
       setLoading(false);
     }
@@ -98,56 +118,133 @@ export default function Dashboard() {
     setTaskForm((f) => ({ ...f, [name]: value }));
   };
 
-  const submitTask = async (e) => {
-    e.preventDefault();
-    if (!selectedRoom) return alert("Primero selecciona una sala.");
+    const submitTask = async (e) => {
+      e.preventDefault();
+      if (!selectedRoom) return alert("Primero selecciona una sala.");
 
-    try {
-      if (editingTask) {
-        await updateTask(selectedRoom.id, editingTask.id, taskForm);
-        alert("Tarea actualizada correctamente");
-      } else {
+      try {
         await createTask(selectedRoom.id, {
           title: taskForm.title,
-          priority: taskForm.priority,
+          description: taskForm.description,
         });
+        alert("Tarea creada correctamente");
+
+        const updatedTasks = await getRoomTasks(selectedRoom.id);
+        setTasks(updatedTasks);
+        setOpenTaskModal(false);
+        setTaskForm({ title: "", description: "", priority: "MEDIUM", dueDate: "", assignedTo: "" });
+      } catch (err) {
+        alert(err.message || "No se pudo guardar la tarea");
       }
+    };
 
-      const updatedTasks = await getRoomTasks(selectedRoom.id);
-      setTasks(updatedTasks);
-      setOpenTaskModal(false);
-      setEditingTask(null);
-      setTaskForm({ title: "", priority: "MEDIUM" });
-    } catch (err) {
-      alert(err.message || "No se pudo guardar la tarea");
-    }
-  };
+   // 🔹 Confirmar eliminación de tarea
+   const confirmDeleteTask = (task) => {
+     setTaskToDelete(task);
+     setOpenDeleteTaskModal(true);
+   };
 
-  // 🔹 Eliminar tarea
-  const handleDeleteTask = async (task) => {
-    if (!selectedRoom) return;
-    const ok = confirm(`¿Eliminar la tarea "${task.title}"?`);
-    if (!ok) return;
 
-    try {
-      await deleteTask(selectedRoom.id, task.id);
-      const updatedTasks = await getRoomTasks(selectedRoom.id);
-      setTasks(updatedTasks);
-      alert("Tarea eliminada correctamente");
-    } catch (err) {
-      alert(err.message || "No se pudo eliminar la tarea");
-    }
-  };
 
-  // 🔹 Editar tarea
-  const handleEditTask = (task) => {
-    setEditingTask(task);
-    setTaskForm({
-      title: task.title,
-      priority: task.priority || "MEDIUM",
-    });
-    setOpenTaskModal(true);
-  };
+     const handleBuscar = async () => {
+       const trimmed = usernameInput.trim();
+       if (!trimmed) {
+         alert("Ingresa un username");
+         return;
+       }
+      setSearching(true);
+      setMessage("Buscando usuario...");
+      try {
+        const user = await searchUser(trimmed);
+        if (user && user._id) {
+          setUserIdSeleccionado(user._id);
+          setMessage(`Usuario encontrado: ${user.username}`);
+        } else {
+          setMessage("Usuario no encontrado");
+          setUserIdSeleccionado("");
+        }
+      } catch (err) {
+        if (err.status === 404) {
+          setMessage("Usuario no encontrado");
+        } else {
+          setMessage("Error al buscar usuario");
+        }
+        setUserIdSeleccionado("");
+      } finally {
+        setSearching(false);
+      }
+    };
+
+    const submitAddMember = async () => {
+      if (!selectedRoom) {
+        alert("Selecciona una sala primero");
+        return;
+      }
+      if (!userIdSeleccionado) {
+        alert("Primero busca un usuario");
+        return;
+      }
+      setAdding(true);
+      try {
+        await addMember(selectedRoom.id, userIdSeleccionado, "EDITOR");
+        alert("Miembro añadido correctamente");
+        setOpenAddMemberModal(false);
+        setUsernameInput("");
+        setUserIdSeleccionado("");
+        setMessage("");
+        // Refrescar miembros
+        try {
+          const roomDetails = await getRoomDetails(selectedRoom.id);
+          setSelectedRoom(roomDetails);
+        } catch (refreshErr) {
+          console.error("Error al refrescar miembros:", refreshErr);
+        }
+       } catch (err) {
+         if (err.status === 401) {
+           alert("Sesión expirada. Redirigiendo a login.");
+           window.location.href = "/login";
+         } else {
+           alert(err.message || "No se pudo añadir el miembro");
+         }
+       } finally {
+        setAdding(false);
+      }
+    };
+
+   // 🔹 Cambiar rol de miembro
+   const handleChangeRole = async (memberId, newRole) => {
+     try {
+       await updateMemberRole(selectedRoom.id, memberId, newRole);
+       const roomDetails = await getRoomDetails(selectedRoom.id);
+       setSelectedRoom(roomDetails);
+     } catch (err) {
+       alert(err.message || "No se pudo cambiar el rol");
+     }
+   };
+
+   // 🔹 Eliminar tarea
+   const handleDeleteTask = async () => {
+     try {
+       await deleteTask(selectedRoom.id, taskToDelete.id);
+       const updatedTasks = await getRoomTasks(selectedRoom.id);
+       setTasks(updatedTasks);
+       setOpenDeleteTaskModal(false);
+       setTaskToDelete(null);
+     } catch (err) {
+       alert(err.message || "No se pudo eliminar la tarea");
+     }
+   };
+
+   // 🔹 Marcar tarea como completada/no completada
+   const handleToggleComplete = async (task) => {
+     try {
+       await updateTask(selectedRoom.id, task.id, { completed: !task.completed });
+       const updatedTasks = await getRoomTasks(selectedRoom.id);
+       setTasks(updatedTasks);
+     } catch (err) {
+       alert(err.message || "No se pudo actualizar la tarea");
+     }
+   };
 
   // 🔹 Confirmar eliminación de sala
   const confirmDeleteRoom = (room) => {
@@ -230,85 +327,140 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* 🟩 Panel de tareas */}
-            <aside className="dash-right">
-              <h2 className="dash-section-title">
-                {selectedRoom
-                  ? `Tareas de ${selectedRoom.name}`
-                  : "Selecciona una sala"}
-              </h2>
+              {/* 🟩 Panel de tareas y miembros */}
+              <aside className="dash-right">
+                <h2 className="dash-section-title">
+                  {selectedRoom
+                    ? `Sala: ${selectedRoom.name}`
+                    : "Selecciona una sala"}
+                </h2>
 
-              <div className="tasks-panel">
-                {!selectedRoom ? (
-                  <div className="tasks-empty">
-                    Selecciona una sala para ver sus tareas
-                  </div>
-                ) : tasks.length === 0 ? (
-                  <div className="tasks-empty">No hay tareas en esta sala 🧹</div>
-                ) : (
-                  <ul className="tasks-list">
-                    {tasks.map((t) => (
-                      <li key={t.id} className="task-item">
-                        <div
-                          className="task-dot"
-                          style={{
-                            background:
+                 {selectedRoom && (
+                   <div className="room-info">
+                     <h3>Información de la Sala</h3>
+                     <div>
+                       <p><strong>Descripción:</strong> {selectedRoom.description || "Sin descripción"}</p>
+                       <p><strong>Pública:</strong> {selectedRoom.isPublic ? "Sí" : "No"}</p>
+                       <p><strong>Miembros:</strong> {selectedRoom.members?.length || 0}</p>
+                     </div>
+                     {selectedRoom.members?.some(m => m.userId === me?.user?.id && (m.role === "OWNER" || m.role === "ADMIN")) && (
+                       <button className="btn-secondary" onClick={() => setOpenAddMemberModal(true)}>
+                         + Añadir Miembro
+                       </button>
+                     )}
+                   </div>
+                 )}
+
+                 {selectedRoom && (
+                   <div className="members-list">
+                     <h3>Miembros</h3>
+                      <ul>
+                        {selectedRoom.members?.map((m) => {
+                          const roleMap = {
+                            OWNER: "Propietario",
+                            EDITOR: "Miembro",
+                            VIEWER: "Lector",
+                          };
+                          return (
+                            <li key={m.userId}>
+                              <div>
+                                <strong>{m.username}</strong> <span>({roleMap[m.role] || m.role})</span>
+                              </div>
+                              {selectedRoom.members?.find(mem => mem.userId === me?.user?.id)?.role === "OWNER" && m.role !== "OWNER" && (
+                                <select
+                                  value={m.role}
+                                  onChange={(e) => handleChangeRole(m.userId, e.target.value)}
+                                >
+                                  <option value="EDITOR">Miembro</option>
+                                  <option value="VIEWER">Lector</option>
+                                </select>
+                              )}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                   </div>
+                 )}
+
+                <h3>Tareas</h3>
+
+                <div className="tasks-panel">
+                  {!selectedRoom ? (
+                    <div className="tasks-empty">
+                      Selecciona una sala para ver sus tareas
+                    </div>
+                  ) : tasks.length === 0 ? (
+                    <div className="tasks-empty">No hay tareas en esta sala 🧹</div>
+                  ) : (
+                    <ul className="tasks-list">
+                      {tasks.map((t) => (
+                       <li key={t.id} className="task-item">
+                         <div
+                           className="task-dot"
+                           style={{
+                             background:
+                               t.priority === "HIGH"
+                                 ? "#ef4444"
+                                 : t.priority === "LOW"
+                                 ? "#22c55e"
+                                 : "#f59e0b",
+                           }}
+                         />
+                          <div className="task-title" style={t.completed ? { textDecoration: "line-through", opacity: 0.6 } : {}}>{t.title}</div>
+
+                          <div className="task-meta" style={{ fontSize: "0.8em", color: "#666", marginTop: "4px" }}>
+                            Asignada a: {t.assignedToName || "Nadie"} | Creada por: {t.createdByName}
+                          </div>
+
+                          <span
+                            className={`badge ${
                               t.priority === "HIGH"
-                                ? "#ef4444"
+                                ? "badge-danger"
                                 : t.priority === "LOW"
-                                ? "#22c55e"
-                                : "#f59e0b",
-                          }}
-                        />
-                        <div className="task-title">{t.title}</div>
-
-                        <span
-                          className={`badge ${
-                            t.priority === "HIGH"
-                              ? "badge-danger"
-                              : t.priority === "LOW"
-                              ? "badge-success"
-                              : "badge-warning"
-                          }`}
-                        >
-                          {t.priority}
-                        </span>
-
-                        <div className="task-actions">
-                          <button
-                            className="btn-ghost small"
-                            onClick={() => handleEditTask(t)}
+                                ? "badge-success"
+                                : "badge-warning"
+                            }`}
                           >
-                            ✏️
-                          </button>
-                          <button
-                            className="btn-ghost small"
-                            onClick={() => handleDeleteTask(t)}
-                          >
-                            🗑️
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {selectedRoom && (
-                  <button
-                    className="btn-panel"
-                    onClick={() => {
-                      setEditingTask(null);
-                      setTaskForm({ title: "", priority: "MEDIUM" });
-                      setOpenTaskModal(true);
-                    }}
-                  >
-                    + Nueva tarea
-                  </button>
-                )}
-              </div>
-            </aside>
-          </section>
-        )}
-      </main>
+                            {t.priority}
+                          </span>
+ 
+                          <div className="task-actions">
+                            <button
+                              className="btn-ghost small"
+                              onClick={() => handleToggleComplete(t)}
+                              title={t.completed ? "Marcar como pendiente" : "Marcar como completada"}
+                            >
+                              {t.completed ? "↩️" : "✅"}
+                            </button>
+                            <button
+                              className="btn-ghost small"
+                              onClick={() => confirmDeleteTask(t)}
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                       </li>
+                     ))}
+                   </ul>
+                 )}
+                 {selectedRoom && (
+                       <button
+                         className="btn-panel"
+                         onClick={() => {
+                           setTaskForm({ title: "", description: "" });
+                           setOpenTaskModal(true);
+                         }}
+                       >
+                         + Nueva tarea
+                       </button>
+                 )}
+               </div>
+             </aside>
+           </section>
+         )}
+       </main>
+
+
 
       {/* 🔹 Modal Crear Sala */}
       {openRoomModal && (
@@ -347,18 +499,18 @@ export default function Dashboard() {
                 Sala pública
               </label>
 
-              <div className="modal-actions">
-                <button type="submit" className="btn-primary">
-                  Crear
-                </button>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => setOpenRoomModal(false)}
-                >
-                  Cancelar
-                </button>
-              </div>
+               <div className="modal-actions">
+                 <button type="submit" className="btn-primary">
+                   Crear Sala
+                 </button>
+                 <button
+                   type="button"
+                   className="btn-secondary"
+                   onClick={() => setOpenRoomModal(false)}
+                 >
+                   Cancelar
+                 </button>
+               </div>
             </form>
           </div>
         </div>
@@ -368,34 +520,33 @@ export default function Dashboard() {
       {openTaskModal && (
         <div className="modal-backdrop">
           <div className="modal">
-            <h2 className="modal-title">
-              {editingTask ? "Editar tarea" : "Nueva tarea"}
-            </h2>
-            <form onSubmit={submitTask} className="modal-form">
-              <label>
-                Título:
-                <input
-                  type="text"
-                  name="title"
-                  value={taskForm.title}
-                  onChange={handleTaskChange}
-                  required
-                  placeholder="Ej. examen de física"
-                />
-              </label>
+             <h2 className="modal-title">Nueva tarea</h2>
+             <form onSubmit={submitTask} className="modal-form">
+               <label>
+                 Título:
+                 <input
+                   type="text"
+                   name="title"
+                   value={taskForm.title}
+                   onChange={handleTaskChange}
+                   required
+                   placeholder="Ej. examen de física"
+                 />
+               </label>
 
-              <label>
-                Prioridad:
-                <select
-                  name="priority"
-                  value={taskForm.priority}
-                  onChange={handleTaskChange}
-                >
-                  <option value="LOW">Baja</option>
-                  <option value="MEDIUM">Media</option>
-                  <option value="HIGH">Alta</option>
-                </select>
-              </label>
+               <label>
+                 Descripción:
+                 <textarea
+                   name="description"
+                   value={taskForm.description}
+                   onChange={handleTaskChange}
+                   placeholder="(opcional)"
+                 />
+               </label>
+
+
+
+
 
               <div className="modal-actions">
                 <button type="submit" className="btn-primary">
@@ -442,6 +593,113 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* 🔹 Modal Eliminar Tarea */}
+      {openDeleteTaskModal && (
+        <div className="modal-backdrop">
+          <div className="modal">
+            <h2 className="modal-title">Eliminar tarea</h2>
+            <p
+              style={{
+                textAlign: "center",
+                color: "#a8b3c7",
+                marginBottom: "14px",
+              }}
+            >
+              ¿Seguro que quieres eliminar <strong>{taskToDelete?.title}</strong>?
+            </p>
+            <div className="modal-actions">
+              <button
+                className="btn-ghost"
+                onClick={() => setOpenDeleteTaskModal(false)}
+              >
+                Cancelar
+              </button>
+              <button className="btn-primary" onClick={handleDeleteTask}>
+                Eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+        {/* 🔹 Modal Añadir Miembro */}
+        {openAddMemberModal && selectedRoom && (
+          <div className="modal-backdrop">
+            <div className="modal">
+              <h2 className="modal-title">Añadir Miembro a la Sala</h2>
+              <div className="modal-form">
+                <label>
+                  Buscar por:
+                  <select
+                    value={searchMode}
+                    onChange={(e) => {
+                      const newMode = e.target.value;
+                      setSearchMode(newMode);
+                      setUsernameInput("");
+                      setUserIdSeleccionado("");
+                      setMessage("");
+                    }}
+                  >
+                    <option value="username">Username</option>
+                    <option value="id">ID</option>
+                  </select>
+                </label>
+                <label>
+                  {searchMode === "username" ? "Usuario:" : "User ID:"}
+                  <input
+                    type="text"
+                    value={usernameInput}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setUsernameInput(val);
+                      if (searchMode === "id") {
+                        if (/^[a-fA-F0-9]{24}$/.test(val)) {
+                          setUserIdSeleccionado(val);
+                          setMessage("ID válido");
+                        } else {
+                          setUserIdSeleccionado("");
+                          setMessage("ID inválido");
+                        }
+                      } else {
+                        setUserIdSeleccionado("");
+                        setMessage("");
+                      }
+                    }}
+                    placeholder={searchMode === "username" ? "Ingresa username" : "Ingresa userId (24 hex)"}
+                  />
+                  {searchMode === "username" && (
+                    <button
+                      type="button"
+                      disabled={searching}
+                      onClick={handleBuscar}
+                    >
+                      {searching ? "Buscando..." : "Buscar"}
+                    </button>
+                  )}
+                </label>
+                {message && <p>{message}</p>}
+                <div className="modal-actions">
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={adding || !userIdSeleccionado}
+                    onClick={submitAddMember}
+                  >
+                    {adding ? "Añadiendo..." : "Añadir Miembro"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setOpenAddMemberModal(false)}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   );
 }

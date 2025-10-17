@@ -16,14 +16,14 @@ export const getToken = () => localStorage.getItem("auth_token");
 async function safeJson(res) {
   try {
     return await res.json();
-  } catch (e) {
+  } catch {
     return null;
   }
 }
 async function safeText(res) {
   try {
     return await res.text();
-  } catch (e) {
+  } catch {
     return "";
   }
 }
@@ -40,7 +40,7 @@ export async function login(username, password) {
   const r = await fetch(makeUrl("/api/auth/login"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
+     body: JSON.stringify({ username, password }),
   });
 
   const body = await safeJson(r);
@@ -165,11 +165,10 @@ export function getRoomTasks(roomId, completed) {
 }
 
 // ✅ Crear tarea
-export function createTask(roomId, { title, dueDate, priority }) {
+export function createTask(roomId, { title, description }) {
   return apiPost(`/api/rooms/${encodeURIComponent(roomId)}/tasks`, {
     title,
-    dueDate: dueDate || null, // ISO string o null
-    priority: priority || "MEDIUM", // ajusta si tu backend usa otro enum
+    description: description || "",
   });
 }
 
@@ -186,7 +185,7 @@ export async function register(name, username, password) {
   const r = await fetch(makeUrl("/api/users/signup-user"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, username, password }),
+     body: JSON.stringify({ name, username, password }),
   });
 
   const body = await safeJson(r);
@@ -204,6 +203,41 @@ export async function register(name, username, password) {
 // ✅ Eliminar sala
 export function deleteRoom(roomId) {
   return apiDelete(`/api/rooms/${encodeURIComponent(roomId)}`);
+}
+
+// ✅ Obtener detalles de sala
+export function getRoomDetails(roomId) {
+  return apiGet(`/api/rooms/${encodeURIComponent(roomId)}`);
+}
+
+// ✅ Añadir miembro a sala
+export function addMember(roomId, userId, role) {
+  return apiPost(`/api/rooms/${encodeURIComponent(roomId)}/members`, { userId, role });
+}
+
+// ✅ Buscar usuario por username
+export function searchUser(username) {
+  return apiGet(`/api/users/by-username/${encodeURIComponent(username)}`);
+}
+
+// ✅ Actualizar rol de miembro
+export function updateMemberRole(roomId, memberId, role) {
+  return apiPut(`/api/rooms/${encodeURIComponent(roomId)}/members/${encodeURIComponent(memberId)}/role?role=${encodeURIComponent(role)}`);
+}
+
+// ✅ Unirse a sala pública
+export function joinRoom(roomId) {
+  return apiPost(`/api/rooms/${encodeURIComponent(roomId)}/join`);
+}
+
+// ✅ Obtener mensajes de sala
+export function getRoomMessages(roomId) {
+  return apiGet(`/api/rooms/${encodeURIComponent(roomId)}/messages`);
+}
+
+// ✅ Obtener historial de sala
+export function getRoomHistory(roomId) {
+  return apiGet(`/api/rooms/${encodeURIComponent(roomId)}/history`);
 }
 
 

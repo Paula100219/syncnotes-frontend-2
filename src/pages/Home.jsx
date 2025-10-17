@@ -7,7 +7,7 @@ export default function Home() {
         ¡Bienvenido a SyncNotes!
       </h1>
       <p className="text-gray-700 text-lg">
-        Hola {username || "usuario"}, nos alegra verte de nuevo 
+        Hola {username || "usuario"}, nos alegra verte de nuevo
       </p>
     </div>
   );

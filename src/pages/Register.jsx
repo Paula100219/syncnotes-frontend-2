@@ -17,26 +17,50 @@ export default function Register() {
     const { name, value } = e.target;
     setForm((f) => ({ ...f, [name]: value }));
 
-    // limpiar error del campo al escribir
-    if (errors[name] && value && String(value).trim()) {
-      setErrors((prev) => {
-        const n = { ...prev };
-        delete n[name];
-        return n;
-      });
-    }
+    // validar en tiempo real
+    const error = validateField(name, value);
+    setErrors((prev) => ({ ...prev, [name]: error }));
+
     if (message) setMessage(null);
+  }
+
+  function validateField(name, value) {
+    let error = null;
+    if (name === 'name') {
+      if (!value || !String(value).trim()) {
+        error = "No has ingresado tus datos.";
+      } else if (String(value).trim().split(' ').length < 2) {
+        error = "Ingresa nombre y apellido.";
+      }
+    } else if (name === 'username') {
+      if (!value || !String(value).trim()) {
+        error = "No has ingresado tus datos.";
+      }
+    } else if (name === 'password') {
+      if (!value || !String(value).trim()) {
+        error = "No has ingresado tus datos.";
+      } else {
+        const pwd = String(value);
+        if (pwd.length < 8 || pwd.length > 20) {
+          error = "La contraseña debe tener entre 8 y 20 caracteres.";
+        } else if (!/[A-Z]/.test(pwd)) {
+          error = "La contraseña debe tener al menos una mayúscula.";
+        } else if (!/[a-z]/.test(pwd)) {
+          error = "La contraseña debe tener al menos una minúscula.";
+        } else if (!/[0-9]/.test(pwd)) {
+          error = "La contraseña debe tener al menos un número.";
+        }
+      }
+    }
+    return error;
   }
 
   function validate() {
     const e = {};
-    if (!form.name || !String(form.name).trim()) e.name = "No has ingresado tus datos.";
-    if (!form.username || !String(form.username).trim()) e.username = "No has ingresado tus datos.";
-    if (!form.password || !String(form.password).trim()) {
-      e.password = "No has ingresado tus datos.";
-    } else if (String(form.password).length < 6) {
-      e.password = "La contraseña debe tener al menos 6 caracteres.";
-    }
+    Object.keys(form).forEach(name => {
+      const error = validateField(name, form[name]);
+      if (error) e[name] = error;
+    });
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -81,11 +105,20 @@ export default function Register() {
       const m = normalizeMsg(apiMsgRaw);
 
       let text;
-      // comunes: 409 conflicto (usuario existente) o mensajes que lo indiquen
       if (status === 409 || m.includes("ya existe") || m.includes("exist") || m.includes("duplic")) {
         text = "El usuario ya existe.";
-      } else if (status === 400 && (m.includes("password") || m.includes("contrasena") || m.includes("contraseña"))) {
-        text = apiMsgRaw || "La contraseña no cumple los requisitos.";
+      } else if (status === 400) {
+        if (m.includes("password") || m.includes("contrasena") || m.includes("contraseña")) {
+          text = "Contraseña inválida.";
+        } else if (m.includes("username") || m.includes("usuario")) {
+          text = "El usuario no es válido.";
+        } else if (m.includes("name") || m.includes("nombre")) {
+          text = "El nombre no es válido.";
+        } else {
+          text = apiMsgRaw || "Datos inválidos.";
+        }
+      } else if (status === 422) {
+        text = "Datos inválidos. Revisa los campos.";
       } else if (status >= 500) {
         text = apiMsgRaw || "Error en el servidor. Intenta más tarde.";
       } else {
@@ -100,7 +133,7 @@ export default function Register() {
 
   const fields = [
     { label: "Nombre completo", type: "text", name: "name", placeholder: "Nombre completo" },
-    { label: "Usuario", type: "text", name: "username", placeholder: "Usuario" },
+    { label: "Username", type: "text", name: "username", placeholder: "usuario" },
     { label: "Contraseña", type: "password", name: "password", placeholder: "Contraseña" },
   ];
 

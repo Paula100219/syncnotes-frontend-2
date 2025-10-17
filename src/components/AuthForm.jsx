@@ -44,13 +44,13 @@ export default function AuthForm(props) {
               className={"ns-input" + (errMsg ? " ns-input--err" : "")}
               aria-invalid={!!errMsg}
               aria-describedby={descId}
-              autoComplete={
-                id === "password"
-                  ? "current-password"
-                  : id === "username"
-                  ? "username"
-                  : undefined
-              }
+               autoComplete={
+                 id === "password"
+                   ? "current-password"
+                   : id === "username"
+                   ? "username"
+                   : undefined
+               }
             />
           </div>
         );

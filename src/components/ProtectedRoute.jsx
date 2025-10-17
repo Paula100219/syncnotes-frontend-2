@@ -17,7 +17,7 @@ export default function ProtectedRoute({ children }) {
       try {
         await getMe(); // valida token rápido
         if (mounted) setState({ loading: false, ok: true });
-      } catch (err) {
+      } catch {
         // token inválido/expirado
         setToken(""); // limpia
         localStorage.removeItem("auth_token");

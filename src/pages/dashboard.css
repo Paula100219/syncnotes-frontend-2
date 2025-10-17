@@ -34,6 +34,25 @@
 .btn-primary:hover{ filter:brightness(1.08); transform: translateY(-1px); }
 .btn-primary:active{ transform: translateY(0); }
 
+/* Botón añadir miembro */
+.btn-add-member{
+  background: linear-gradient(135deg, #10b981, #059669);
+  color:#fff; border:none;
+  padding:12px 20px; border-radius:12px; font-weight:600;
+  box-shadow:0 8px 20px rgba(16,185,129,.3);
+  cursor:pointer; transition:transform .08s ease, filter .15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-add-member:hover{ filter:brightness(1.1); transform: translateY(-2px); }
+.btn-add-member:active{ transform: translateY(0); }
+.btn-add-member::before{
+  content: '+';
+  font-size: 18px;
+  font-weight: bold;
+}
+
 /* Layout general */
 .dash-grid{
   display:grid;
@@ -372,4 +391,90 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* === ROOM INFO AND MEMBERS === */
+.room-info {
+  margin-bottom: 20px;
+  padding: 18px 20px;
+  background: linear-gradient(145deg, rgba(17, 24, 39, 0.95), rgba(11, 15, 25, 0.95));
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 18px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.room-info h3 {
+  margin-top: 0;
+  color: #e6eaf2;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.room-info p {
+  margin: 0;
+  color: #a8b3c7;
+}
+
+.room-info > div {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.room-info strong {
+  color: #e6eaf2;
+}
+
+.members-list {
+  margin-bottom: 20px;
+  padding: 18px 20px;
+  background: linear-gradient(145deg, rgba(17, 24, 39, 0.95), rgba(11, 15, 25, 0.95));
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 18px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.members-list h3 {
+  margin-top: 0;
+  color: #e6eaf2;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.members-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.members-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  transition: background 0.2s ease;
+}
+
+.members-list li:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.members-list strong {
+  color: #e6eaf2;
+}
+
+.members-list span {
+  color: #a8b3c7;
+  font-size: 0.9em;
+}
+
+.members-list select {
+  font-size: 0.8em;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  color: #e6eaf2;
+  outline: none;
 }
