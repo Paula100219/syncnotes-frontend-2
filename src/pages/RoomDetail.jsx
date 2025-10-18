@@ -308,7 +308,7 @@ export default function RoomDetail() {
 
       <main className="dash-main">
         <header className="dash-header">
-          <button className="btn-secondary" onClick={() => navigate("/dashboard")}>
+          <button className="btn-primary" onClick={() => navigate("/dashboard")}>
             ← Volver a Mis Salas
           </button>
           <h1 className="dash-title">Sala: {room.name}</h1>
@@ -332,7 +332,7 @@ export default function RoomDetail() {
                  </p>
                )}
                <p><strong>Miembros:</strong> {safeMembers.length}</p>
-              <button className="btn-secondary" onClick={handleOpenAddMember}>
+              <button className="btn-primary" onClick={handleOpenAddMember} style={{ marginTop: '10px' }}>
                 + Añadir Miembro
               </button>
             </div>
