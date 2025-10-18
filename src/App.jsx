@@ -1,14 +1,15 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
+import RoomsList from "./pages/RoomsList";
+import RoomDetail from "./pages/RoomDetail";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 export default function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
 
@@ -19,7 +20,16 @@ export default function App() {
           path="/dashboard"
           element={
             <ProtectedRoute>
-              <Dashboard />
+              <RoomsList />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/rooms/:roomId"
+          element={
+            <ProtectedRoute>
+              <RoomDetail />
             </ProtectedRoute>
           }
         />

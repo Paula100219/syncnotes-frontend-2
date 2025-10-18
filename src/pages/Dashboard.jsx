@@ -197,12 +197,16 @@ export default function Dashboard() {
          setMessage("Miembro añadido correctamente");
          setOpenAddMemberModal(false);
          resetForm();
-         // Refrescar miembros
+         // Refrescar miembros y salas
          try {
-           const roomDetails = await getRoomDetails(selectedRoom.id);
+           const [roomDetails, updatedRooms] = await Promise.all([
+             getRoomDetails(selectedRoom.id),
+             getMyRooms(),
+           ]);
            setSelectedRoom(roomDetails);
+           setMe((prev) => ({ ...prev, rooms: updatedRooms }));
          } catch (refreshErr) {
-           console.error("Error al refrescar miembros:", refreshErr);
+           console.error("Error al refrescar:", refreshErr);
          }
         } catch (err) {
           if (err.status === 401 || err.status === 403) {
@@ -303,48 +307,10 @@ export default function Dashboard() {
         ) : error ? (
           <div className="ns-alert ns-alert--err">{error}</div>
         ) : (
-          <section className="dash-grid">
-            {/* 🟦 Salas */}
-            <div className="dash-left">
-              <h2 className="dash-section-title">Mis Salas</h2>
-              <div className="rooms-grid">
-                {rooms.length === 0 ? (
-                  <div className="room-empty">
-                    <div className="room-empty-icon">👥</div>
-                    <div className="room-empty-title">Aún no tienes salas.</div>
-                    <div className="room-empty-sub">
-                      ¡Crea una para empezar a colaborar!
-                    </div>
-                  </div>
-                ) : (
-                  rooms.map((r) => (
-                    <div key={r.id} className="room-card">
-                      <div className="room-title">{r.name}</div>
-                      <div className="room-sub">
-                        {r.membersCount ?? 0} miembros
-                      </div>
-                      <div className="room-actions">
-                        <button
-                          className="btn-secondary"
-                          onClick={() => handleOpenRoom(r)}
-                        >
-                          Abrir sala
-                        </button>
-                        <button
-                          className="btn-ghost"
-                          onClick={() => confirmDeleteRoom(r)}
-                        >
-                          🗑️ Eliminar
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-              {/* 🟩 Panel de tareas y miembros */}
-              <aside className="dash-right">
+           {selectedRoom ? (
+             /* Vista limpia de sala */
+             <section className="dash-room-view">
+               <aside className="dash-right">
                 <h2 className="dash-section-title">
                   {selectedRoom
                     ? `Sala: ${selectedRoom.name}`
@@ -474,10 +440,70 @@ export default function Dashboard() {
                        >
                          + Nueva tarea
                        </button>
-                 )}
+                  )}
+                </div>
+                <button
+                  className="btn-secondary"
+                  onClick={() => setSelectedRoom(null)}
+                  style={{ marginTop: '20px' }}
+                >
+                  ← Volver a Mis Salas
+                </button>
+              </aside>
+            </section>
+           ) : (
+             /* Vista de grid */
+             <section className="dash-grid">
+               {/* 🟦 Salas */}
+               <div className="dash-left">
+                 <h2 className="dash-section-title">Mis Salas</h2>
+                 <div className="rooms-grid">
+                   {rooms.length === 0 ? (
+                     <div className="room-empty">
+                       <div className="room-empty-icon">👥</div>
+                       <div className="room-empty-title">Aún no tienes salas.</div>
+                       <div className="room-empty-sub">
+                         ¡Crea una para empezar a colaborar!
+                       </div>
+                     </div>
+                   ) : (
+                     rooms.map((r) => (
+                       <div key={r.id} className="room-card">
+                         <div className="room-title">{r.name}</div>
+                         <div className="room-sub">
+                           {r.members?.length ?? 0} miembros
+                         </div>
+                         <div className="room-actions">
+                           <button
+                             className="btn-secondary"
+                             onClick={() => handleOpenRoom(r)}
+                           >
+                             Abrir sala
+                           </button>
+                           <button
+                             className="btn-ghost"
+                             onClick={() => confirmDeleteRoom(r)}
+                           >
+                             🗑️ Eliminar
+                           </button>
+                         </div>
+                       </div>
+                     ))
+                   )}
+                 </div>
                </div>
-             </aside>
-           </section>
+
+               {/* 🟩 Panel vacío en grid */}
+               <aside className="dash-right">
+                 <h2 className="dash-section-title">
+                   Selecciona una sala
+                 </h2>
+                 <div className="tasks-empty">
+                   Haz clic en "Abrir sala" para ver detalles
+                 </div>
+               </aside>
+             </section>
+           )}
          )}
        </main>
 

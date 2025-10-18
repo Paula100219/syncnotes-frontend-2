@@ -393,9 +393,17 @@
   }
 }
 
+/* === ROOM DETAIL VIEW === */
+.dash-room-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
 /* === ROOM INFO AND MEMBERS === */
 .room-info {
-  margin-bottom: 20px;
   padding: 18px 20px;
   background: linear-gradient(145deg, rgba(17, 24, 39, 0.95), rgba(11, 15, 25, 0.95));
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -426,7 +434,6 @@
 }
 
 .members-list {
-  margin-bottom: 20px;
   padding: 18px 20px;
   background: linear-gradient(145deg, rgba(17, 24, 39, 0.95), rgba(11, 15, 25, 0.95));
   border: 1px solid rgba(255, 255, 255, 0.06);
