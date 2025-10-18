@@ -4,6 +4,54 @@ import Navbar from "../components/Navbar";
 import { getRoomDetails, getRoomTasks, addMember, updateMemberRole, searchUser, updateTask, deleteTask, getMe, createTask } from "../services/api";
 import "./dashboard.css";
 
+const isValidMember = (m) => {
+  // Acepta objetos con al menos id/username/name.
+  if (!m) return false;
+  if (typeof m === "string") {
+    // Si tu API devuelve strings (ids/usernames) y no puedes resolverlos aquí, déjalos pasar.
+    // Si conoces el username eliminado en este cliente, puedes ocultarlo:
+    const deletedLocal = localStorage.getItem("__lastDeletedUsername");
+    if (deletedLocal && m === deletedLocal) return false;
+    return true;
+  }
+  return Boolean(m.id || m.username || m.name);
+};
+
+const sanitizeMembers = (members = []) => members.filter(isValidMember);
+
+// Intentar obtener el username del owner con los campos que pueda traer "room".
+const getOwnerUsername = (room) => {
+  return (
+    room?.owner?.username ||
+    room?.createdBy?.username ||
+    room?.ownerUsername ||
+    room?.createdByUsername ||
+    null
+  );
+};
+
+// en caso de que tengan flags o roles.
+const findOwnerUsernameFromMembers = (members = []) => {
+  // 1) objetos con flags típicos
+  const byFlag = members.find(
+    (m) =>
+      typeof m !== "string" &&
+      (m.role === "OWNER" ||
+        m.role === "PROPIETARIO" ||
+        m.isOwner === true ||
+        m?.roles?.includes?.("OWNER"))
+  );
+  if (byFlag?.username) return byFlag.username;
+
+  // 2) cadenas con rol dentro (p.ej., "juanperez123:OWNER")
+  const byString = members.find(
+    (m) => typeof m === "string" && /:(owner|propietario)/i.test(m)
+  );
+  if (typeof byString === "string") return byString.split(":")[0];
+
+  return null;
+};
+
 export default function RoomDetail() {
   const { roomId } = useParams();
   const navigate = useNavigate();
@@ -45,9 +93,9 @@ export default function RoomDetail() {
            getRoomDetails(roomId),
            getRoomTasks(roomId),
          ]);
-         setMe(userData);
-         setRoom(roomData);
-         setTasks(tasksData);
+          setMe(userData);
+          setRoom({ ...roomData, members: sanitizeMembers(roomData.members) });
+          setTasks(tasksData);
        } catch (e) {
          setError(e?.message || "No se pudo cargar la sala.");
        } finally {
@@ -104,15 +152,19 @@ export default function RoomDetail() {
         setUserIdSeleccionado("");
 
       }
-    } catch (err) {
-      if (err.status === 404) {
-        setMessage("Usuario no encontrado");
-      } else if (err.status === 401 || err.status === 403) {
-        setMessage("Sesión expirada. Redirigiendo a login.");
-        window.location.href = "/login";
-      } else {
-        setMessage("Error al buscar usuario");
-      }
+     } catch (err) {
+       if (err.status === 404) {
+         setMessage("Usuario no encontrado");
+       } else if (err.status === 401 || err.status === 403) {
+         setMessage("Sesión expirada. Redirigiendo a login.");
+         const deletedU = localStorage.getItem("username");
+         if (deletedU) localStorage.setItem("__lastDeletedUsername", deletedU);
+         localStorage.removeItem("token");
+         localStorage.removeItem("username");
+         window.location.replace("/login");
+       } else {
+         setMessage("Error al buscar usuario");
+       }
       setUserIdSeleccionado("");
 
     } finally {
@@ -129,22 +181,26 @@ export default function RoomDetail() {
 
     try {
       await addMember(roomId, userIdSeleccionado, "EDITOR");
-      setMessage("Miembro añadido correctamente");
-      setOpenAddMemberModal(false);
-      resetForm();
-      // Refrescar
-      const roomData = await getRoomDetails(roomId);
-      setRoom(roomData);
-    } catch (err) {
-      if (err.status === 401 || err.status === 403) {
-        setMessage("Sesión expirada o sin permisos. Redirigiendo a login.");
-        window.location.href = "/login";
-      } else if (err.status === 400) {
-        setMessage(err.message || "Error en la solicitud");
-      } else {
-        setMessage(err.message || "No se pudo añadir el miembro");
-      }
-    }
+       setMessage("Miembro añadido correctamente");
+       setOpenAddMemberModal(false);
+       resetForm();
+       // Refrescar
+       const roomData = await getRoomDetails(roomId);
+       setRoom({ ...roomData, members: sanitizeMembers(roomData.members) });
+     } catch (err) {
+       if (err.status === 401 || err.status === 403) {
+         setMessage("Sesión expirada o sin permisos. Redirigiendo a login.");
+         const deletedU = localStorage.getItem("username");
+         if (deletedU) localStorage.setItem("__lastDeletedUsername", deletedU);
+         localStorage.removeItem("token");
+         localStorage.removeItem("username");
+         window.location.replace("/login");
+       } else if (err.status === 400) {
+         setMessage(err.message || "Error en la solicitud");
+       } else {
+         setMessage(err.message || "No se pudo añadir el miembro");
+       }
+     }
   };
 
   // Cambiar rol
@@ -152,7 +208,7 @@ export default function RoomDetail() {
     try {
       await updateMemberRole(roomId, memberId, newRole);
       const roomData = await getRoomDetails(roomId);
-      setRoom(roomData);
+      setRoom({ ...roomData, members: sanitizeMembers(roomData.members) });
     } catch (err) {
       alert(err.message || "No se pudo cambiar el rol");
     }
@@ -211,10 +267,14 @@ export default function RoomDetail() {
       setTasks((prev) => [newTask, ...prev]);
       setOpenTaskModal(false);
       setTaskForm({ title: "", description: "" });
-    } catch (err) {
-      if (err.status === 401 || err.status === 403) {
-        window.location.href = "/login";
-      } else {
+     } catch (err) {
+       if (err.status === 401 || err.status === 403) {
+         const deletedU = localStorage.getItem("username");
+         if (deletedU) localStorage.setItem("__lastDeletedUsername", deletedU);
+         localStorage.removeItem("token");
+         localStorage.removeItem("username");
+         window.location.replace("/login");
+       } else {
         alert(err.message || "No se pudo crear la tarea");
       }
     } finally {
@@ -227,6 +287,20 @@ export default function RoomDetail() {
   if (!room) return <div className="ns-root"><div>No se encontró la sala.</div></div>;
 
   const myRole = room?.members?.find(m => m.userId === me?.id)?.role;
+  const safeMembers = sanitizeMembers(room?.members || []);
+
+  let ownerUsername = getOwnerUsername(room);
+  if (!ownerUsername) {
+    ownerUsername = findOwnerUsernameFromMembers(safeMembers);
+  }
+
+  let ownerLabel = null;
+  if (ownerUsername) {
+    const ownerObj = safeMembers.find(
+      (m) => typeof m !== "string" && m?.username === ownerUsername
+    );
+    ownerLabel = ownerObj?.name || ownerObj?.username || ownerUsername;
+  }
 
   return (
     <div className="ns-root">
@@ -241,40 +315,61 @@ export default function RoomDetail() {
         </header>
 
         <section className="dash-room-detail">
-          {/* Info sala */}
-          <div className="room-info">
-            <h3>Información de la Sala</h3>
-            <p><strong>Descripción:</strong> {room.description || "Sin descripción"}</p>
-            <p><strong>Pública:</strong> {room.isPublic ? "Sí" : "No"}</p>
-            <p><strong>Miembros:</strong> {room.members?.length || 0}</p>
-            <button className="btn-secondary" onClick={handleOpenAddMember}>
-              + Añadir Miembro
-            </button>
-          </div>
+            {/* Info sala */}
+            <div className="room-info">
+              <h3>Información de la Sala</h3>
+               <p><strong>Descripción:</strong> {room.description || "Sin descripción"}</p>
+               <p><strong>Pública:</strong> {room.isPublic ? "Sí" : "No"}</p>
+               {ownerUsername && (
+                 <p>
+                   <strong>Propietario:</strong>{" "}
+                   {(() => {
+                     const ownerObj = safeMembers.find(
+                       (m) => typeof m !== "string" && m?.username === ownerUsername
+                     );
+                     return ownerObj?.name || ownerObj?.username || ownerUsername;
+                   })()}
+                 </p>
+               )}
+               <p><strong>Miembros:</strong> {safeMembers.length}</p>
+              <button className="btn-secondary" onClick={handleOpenAddMember}>
+                + Añadir Miembro
+              </button>
+            </div>
 
-          {/* Miembros */}
-          <div className="members-list">
-            <h3>Miembros ({room.members?.length || 0})</h3>
-            <ul>
-              {room.members?.map((m) => {
-                const roleMap = { OWNER: "Propietario", EDITOR: "Miembro", VIEWER: "Lector" };
-                const badgeClass = { OWNER: "badge-owner", EDITOR: "badge-editor", VIEWER: "badge-viewer" };
-                return (
-                  <li key={m.userId}>
-                    <div>
-                      <strong>{m.username}</strong> <span className={`badge ${badgeClass[m.role] || ""}`}>{roleMap[m.role] || m.role}</span>
-                    </div>
-                    {room.members?.find(mem => mem.userId === room.ownerId)?.role === "OWNER" && m.role !== "OWNER" && (
-                      <select value={m.role} onChange={(e) => handleChangeRole(m.userId, e.target.value)}>
-                        <option value="EDITOR">Miembro</option>
-                        <option value="VIEWER">Lector</option>
-                      </select>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+              {/* Miembros */}
+              <div className="members-list">
+                 <h3>Miembros ({safeMembers.length})</h3>
+                <ul className="members">
+                   {safeMembers.map((m, i) => {
+                     const key = typeof m === "string" ? m : (m.id || m.username || i);
+                     const username = typeof m === "string"
+                       ? m.split(":")[0] // por si viene "usuario:OWNER"
+                       : m.username;
+                     const label = typeof m === "string"
+                       ? username
+                       : (m.name || m.username);
+                     // Es propietario si coincide con ownerUsername o si su objeto trae flag de owner
+                     const isOwner =
+                       (ownerUsername && username === ownerUsername) ||
+                       (typeof m !== "string" &&
+                         (m.role === "OWNER" ||
+                          m.role === "PROPIETARIO" ||
+                          m.isOwner === true ||
+                          m?.roles?.includes?.("OWNER")));
+                     return (
+                       <li key={key} className="member-item">
+                         <span>{label}</span>
+                         {isOwner ? (
+                           <span className="badge badge-owner">PROPIETARIO</span>
+                         ) : (
+                           <span className="badge badge-member">MIEMBRO</span>
+                         )}
+                       </li>
+                     );
+                   })}
+                </ul>
+              </div>
 
           {/* Tareas */}
           <div className="tasks-panel">
@@ -317,7 +412,7 @@ export default function RoomDetail() {
                          <button
                            className="icon-btn"
                            title="Eliminar tarea"
-                           onClick={() => handleDeleteTask(t)}
+                            onClick={() => confirmDeleteTask(t)}
                          >
                            🗑️
                          </button>
@@ -445,7 +540,7 @@ export default function RoomDetail() {
             <h2 className="modal-title">{selectedTask.title}</h2>
             <div className="modal-form">
               <p><strong>Descripción:</strong> {selectedTask.description?.trim() ? selectedTask.description : "Sin descripción"}</p>
-              <p><strong>Creada por:</strong> {selectedTask.createdByName}</p>
+              <p><strong>Creada por:</strong> {selectedTask.createdByName || "Sin asignar"}</p>
               <div className="modal-actions">
                 <button
                   type="button"
@@ -496,7 +591,7 @@ export default function RoomDetail() {
              {/* Opcional, pequeño pie informativo */}
              {(taskSelected.createdByUsername || taskSelected.createdAt) && (
                <div className="modal-footer meta">
-                 {taskSelected.createdByUsername && <span>Creada por: {taskSelected.createdByUsername}</span>}
+                   <span>Creada por: {taskSelected.createdByUsername || "Sin asignar"}</span>
                  {taskSelected.createdAt && <span>  {new Date(taskSelected.createdAt).toLocaleString()}</span>}
                </div>
              )}

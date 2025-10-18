@@ -4,6 +4,10 @@ import Navbar from "../components/Navbar";
 import { getMe, getMyRooms, deleteRoom, createRoom } from "../services/api";
 import "./dashboard.css";
 
+const isValidMember = (m) => !!m && (typeof m === "string" || m.id || m.username || m.name);
+
+const sanitizeMembers = (members = []) => members.filter(isValidMember);
+
 export default function RoomsList() {
   const [loading, setLoading] = useState(true);
   const [me, setMe] = useState(null);
@@ -65,12 +69,16 @@ export default function RoomsList() {
     try {
       const newRoom = await createRoom(roomForm);
       navigate("/rooms/" + newRoom.id);
-    } catch (err) {
-      if (err.status === 401 || err.status === 403) {
-        window.location.href = "/login";
-      } else {
-        alert(err.message || "No se pudo crear la sala");
-      }
+     } catch (err) {
+       if (err.status === 401 || err.status === 403) {
+         const deletedU = localStorage.getItem("username");
+         if (deletedU) localStorage.setItem("__lastDeletedUsername", deletedU);
+         localStorage.removeItem("token");
+         localStorage.removeItem("username");
+         window.location.replace("/login");
+       } else {
+         alert(err.message || "No se pudo crear la sala");
+       }
     }
   };
 
@@ -109,9 +117,9 @@ export default function RoomsList() {
                   rooms.map((r) => (
                     <div key={r.id} className="room-card">
                       <div className="room-title">{r.name}</div>
-                      <div className="room-sub">
-                        {r.members?.length ?? 0} miembros
-                      </div>
+                       <div className="room-sub">
+                         {sanitizeMembers(r.members || []).length} miembros
+                       </div>
                       <div className="room-actions">
                         <button
                           className="btn-secondary"

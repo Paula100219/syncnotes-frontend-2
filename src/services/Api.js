@@ -145,6 +145,7 @@ async function apiDelete(path) {
 export const getMe = () => apiGet("/api/auth/me");
 
 // Rooms
+export const fetchRooms = () => apiGet("/api/rooms");
 export const getPublicRooms = () => apiGet("/api/rooms/public");
 export const getMyRooms = () => apiGet("/api/rooms/my-rooms");
 

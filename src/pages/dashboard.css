@@ -572,6 +572,11 @@
   color: #fff;
 }
 
+.badge-member {
+  background: #10b981;
+  color: #fff;
+}
+
 /* === MODAL TASK DETAIL === */
 .modal-backdrop {
   position: fixed;

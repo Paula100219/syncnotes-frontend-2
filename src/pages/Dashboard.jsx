@@ -14,7 +14,27 @@ import {
   updateMemberRole,
   searchUser,
 } from "../services/api";
-import "./dashboard.css";
+
+const isValidMember = (m) => {
+  // Acepta objetos con al menos id/username/name.
+  if (!m) return false;
+  if (typeof m === "string") {
+    // Si tu API devuelve strings (ids/usernames) y no puedes resolverlos aquí, déjalos pasar.
+    // Si conoces el username eliminado en este cliente, puedes ocultarlo:
+    const deletedLocal = localStorage.getItem("__lastDeletedUsername");
+    if (deletedLocal && m === deletedLocal) return false;
+    return true;
+  }
+  return Boolean(m.id || m.username || m.name);
+};
+
+const sanitizeMembers = (members = []) => members.filter(isValidMember);
+
+const getResolvedOwner = (members, ownerId) => {
+  const safeMembers = sanitizeMembers(members);
+  const ownerMember = safeMembers.find(m => m.userId === ownerId);
+  return ownerMember ? ownerMember.username : null;
+};
 
 export default function Dashboard() {
   const [loading, setLoading] = useState(true);
@@ -63,7 +83,7 @@ export default function Dashboard() {
       try {
         setLoading(true);
         const data = await getMe();
-        setMe(data);
+        setMe({ ...data, rooms: data.rooms.map(r => ({ ...r, members: sanitizeMembers(r.members) })) });
       } catch (e) {
         setError(e?.message || "No se pudo cargar tu información.");
       } finally {
@@ -86,7 +106,7 @@ export default function Dashboard() {
         getRoomDetails(room.id),
       ]);
       setTasks(roomTasks);
-      setSelectedRoom(roomDetails); // actualizar con detalles completos
+      setSelectedRoom({ ...roomDetails, members: sanitizeMembers(roomDetails.members) }); // actualizar con detalles completos
     } catch {
       alert("No se pudieron cargar los datos de la sala");
     } finally {
@@ -105,7 +125,7 @@ export default function Dashboard() {
     try {
       await createRoom(roomForm);
       const updatedRooms = await getMyRooms();
-      setMe((prev) => ({ ...prev, rooms: updatedRooms }));
+      setMe((prev) => ({ ...prev, rooms: updatedRooms.map(r => ({ ...r, members: sanitizeMembers(r.members) })) }));
       setOpenRoomModal(false);
       setRoomForm({ name: "", description: "", isPublic: false });
     } catch (err) {
@@ -166,15 +186,19 @@ export default function Dashboard() {
            setUserIdSeleccionado("");
            setUsuarioEncontrado(null);
          }
-       } catch (err) {
-         if (err.status === 404) {
-           setMessage("Usuario no encontrado");
-         } else if (err.status === 401 || err.status === 403) {
-           setMessage("Sesión expirada. Redirigiendo a login.");
-           window.location.href = "/login";
-         } else {
-           setMessage("Error al buscar usuario");
-         }
+        } catch (err) {
+          if (err.status === 404) {
+            setMessage("Usuario no encontrado");
+          } else if (err.status === 401 || err.status === 403) {
+            setMessage("Sesión expirada. Redirigiendo a login.");
+            const deletedU = localStorage.getItem("username");
+            if (deletedU) localStorage.setItem("__lastDeletedUsername", deletedU);
+            localStorage.removeItem("token");
+            localStorage.removeItem("username");
+            window.location.replace("/login");
+          } else {
+            setMessage("Error al buscar usuario");
+          }
          setUserIdSeleccionado("");
          setUsuarioEncontrado(null);
        } finally {
@@ -197,26 +221,30 @@ export default function Dashboard() {
          setMessage("Miembro añadido correctamente");
          setOpenAddMemberModal(false);
          resetForm();
-         // Refrescar miembros y salas
-         try {
-           const [roomDetails, updatedRooms] = await Promise.all([
-             getRoomDetails(selectedRoom.id),
-             getMyRooms(),
-           ]);
-           setSelectedRoom(roomDetails);
-           setMe((prev) => ({ ...prev, rooms: updatedRooms }));
-         } catch (refreshErr) {
-           console.error("Error al refrescar:", refreshErr);
-         }
-        } catch (err) {
-          if (err.status === 401 || err.status === 403) {
-            setMessage("Sesión expirada o sin permisos. Redirigiendo a login.");
-            window.location.href = "/login";
-          } else if (err.status === 400) {
-            setMessage(err.message || "Error en la solicitud");
-          } else {
-            setMessage(err.message || "No se pudo añadir el miembro");
+          // Refrescar miembros y salas
+          try {
+            const [roomDetails, updatedRooms] = await Promise.all([
+              getRoomDetails(selectedRoom.id),
+              getMyRooms(),
+            ]);
+            setSelectedRoom({ ...roomDetails, members: sanitizeMembers(roomDetails.members) });
+            setMe((prev) => ({ ...prev, rooms: updatedRooms.map(r => ({ ...r, members: sanitizeMembers(r.members) })) }));
+          } catch (refreshErr) {
+            console.error("Error al refrescar:", refreshErr);
           }
+         } catch (err) {
+           if (err.status === 401 || err.status === 403) {
+             setMessage("Sesión expirada o sin permisos. Redirigiendo a login.");
+             const deletedU = localStorage.getItem("username");
+             if (deletedU) localStorage.setItem("__lastDeletedUsername", deletedU);
+             localStorage.removeItem("token");
+             localStorage.removeItem("username");
+             window.location.replace("/login");
+           } else if (err.status === 400) {
+             setMessage(err.message || "Error en la solicitud");
+           } else {
+             setMessage(err.message || "No se pudo añadir el miembro");
+           }
         } finally {
          setAdding(false);
        }
@@ -231,16 +259,16 @@ export default function Dashboard() {
        setAdding(false);
      };
 
-   // 🔹 Cambiar rol de miembro
-   const handleChangeRole = async (memberId, newRole) => {
-     try {
-       await updateMemberRole(selectedRoom.id, memberId, newRole);
-       const roomDetails = await getRoomDetails(selectedRoom.id);
-       setSelectedRoom(roomDetails);
-     } catch (err) {
-       alert(err.message || "No se pudo cambiar el rol");
-     }
-   };
+    // 🔹 Cambiar rol de miembro
+    const handleChangeRole = async (memberId, newRole) => {
+      try {
+        await updateMemberRole(selectedRoom.id, memberId, newRole);
+        const roomDetails = await getRoomDetails(selectedRoom.id);
+        setSelectedRoom({ ...roomDetails, members: sanitizeMembers(roomDetails.members) });
+      } catch (err) {
+        alert(err.message || "No se pudo cambiar el rol");
+      }
+    };
 
    // 🔹 Eliminar tarea
    const handleDeleteTask = async () => {
@@ -277,7 +305,7 @@ export default function Dashboard() {
     try {
       await deleteRoom(roomToDelete.id);
       const updatedRooms = await getMyRooms();
-      setMe((prev) => ({ ...prev, rooms: updatedRooms }));
+      setMe((prev) => ({ ...prev, rooms: updatedRooms.map(r => ({ ...r, members: sanitizeMembers(r.members) })) }));
       if (selectedRoom?.id === roomToDelete.id) {
         setSelectedRoom(null);
         setTasks([]);
@@ -306,10 +334,10 @@ export default function Dashboard() {
           <div className="dash-loading">Cargando…</div>
         ) : error ? (
           <div className="ns-alert ns-alert--err">{error}</div>
-        ) : (
-           {selectedRoom ? (
-             /* Vista limpia de sala */
-             <section className="dash-room-view">
+          ) : 
+          selectedRoom ? (
+
+              <section className="dash-room-view">
                <aside className="dash-right">
                 <h2 className="dash-section-title">
                   {selectedRoom
@@ -317,68 +345,82 @@ export default function Dashboard() {
                     : "Selecciona una sala"}
                 </h2>
 
-                 {selectedRoom && (
-                   <div className="room-info">
-                     <h3>Información de la Sala</h3>
-                     <div>
-                       <p><strong>Descripción:</strong> {selectedRoom.description || "Sin descripción"}</p>
-                       <p><strong>Pública:</strong> {selectedRoom.isPublic ? "Sí" : "No"}</p>
-                       <p><strong>Miembros:</strong> {selectedRoom.members?.length || 0}</p>
-                     </div>
-                     {selectedRoom.members?.some(m => m.userId === me?.user?.id && (m.role === "OWNER" || m.role === "ADMIN")) && (
-                       <button className="btn-secondary" onClick={() => setOpenAddMemberModal(true)}>
-                         + Añadir Miembro
-                       </button>
-                     )}
-                   </div>
-                 )}
+                  {selectedRoom && (
+                    <div>
+                      <div className="room-info">
+                        <h3>Información de la Sala</h3>
+                        <div>
+                          <p><strong>Descripción:</strong> {selectedRoom.description || "Sin descripción"}</p>
+                          <p><strong>Pública:</strong> {selectedRoom.isPublic ? "Sí" : "No"}</p>
+                          {(() => {
+                            const ownerUsername = getResolvedOwner(selectedRoom.members, selectedRoom.ownerId);
+                            return ownerUsername && <p><strong>Propietario:</strong> {ownerUsername}</p>;
+                          })()}
+                          <p><strong>Miembros:</strong> {sanitizeMembers(selectedRoom.members).length}</p>
+                          {selectedRoom.members && selectedRoom.members.some(m => m.userId === me?.id && (m.role === "OWNER" || m.role === "ADMIN")) && (
+                           <button className="btn-secondary" onClick={() => setOpenAddMemberModal(true)}>
+                             + Añadir Miembro
+                           </button>
+                          )}
+                        </div>
 
-                 {selectedRoom && (
-                   <div className="members-list">
-                      <h3>Miembros ({selectedRoom.members?.length || 0})</h3>
-                       <ul>
-                         {selectedRoom.members?.map((m) => {
-                           const roleMap = {
-                             OWNER: "Propietario",
-                             EDITOR: "Miembro",
-                             VIEWER: "Lector",
-                           };
-                           const badgeClass = {
-                             OWNER: "badge-owner",
-                             EDITOR: "badge-editor",
-                             VIEWER: "badge-viewer",
-                           };
-                           return (
-                             <li key={m.userId}>
-                               <div>
-                                 <strong>{m.username}</strong> <span className={`badge ${badgeClass[m.role] || ""}`}>{roleMap[m.role] || m.role}</span>
-                               </div>
-                               {selectedRoom.members?.find(mem => mem.userId === me?.user?.id)?.role === "OWNER" && m.role !== "OWNER" && (
-                                 <select
-                                   value={m.role}
-                                   onChange={(e) => handleChangeRole(m.userId, e.target.value)}
-                                 >
-                                   <option value="EDITOR">Miembro</option>
-                                   <option value="VIEWER">Lector</option>
-                                 </select>
-                               )}
-                             </li>
-                           );
-                         })}
-                       </ul>
-                   </div>
-                 )}
+                      </div>
+                      <div className="members-list">
+                       <h3>Miembros ({sanitizeMembers(selectedRoom.members).length})</h3>
+                        <ul>
+                           {(() => {
+                             const ownerUsername = getResolvedOwner(selectedRoom.members, selectedRoom.ownerId);
+                             return sanitizeMembers(selectedRoom.members).map((m) => {
+                               const roleMap = {
+                                 OWNER: "Propietario",
+                                 EDITOR: "Miembro",
+                                 VIEWER: "Lector",
+                               };
+                               const badgeClass = {
+                                 OWNER: "badge-owner",
+                                 EDITOR: "badge-editor",
+                                 VIEWER: "badge-viewer",
+                               };
+                               const isOwner = m.username === ownerUsername;
+                               const effectiveRole = isOwner ? "OWNER" : m.role;
+                               const label = typeof m === "string" ? m : (m.name || m.username || "Sin asignar");
+                               return (
+                                 <li key={typeof m === "string" ? m : m.userId}>
+                                   <div>
+                                     <strong>{label}</strong> <span className={`badge ${badgeClass[effectiveRole] || ""}`}>{roleMap[effectiveRole] || effectiveRole}</span>
+                                   </div>
+                                  {selectedRoom.members?.find(mem => mem.userId === me?.id)?.role === "OWNER" && m.role !== "OWNER" && (
+                                    <select
+                                      value={m.role}
+                                      onChange={(e) => handleChangeRole(m.userId, e.target.value)}
+                                    >
+                                      <option value="EDITOR">Miembro</option>
+                                      <option value="VIEWER">Lector</option>
+                                    </select>
+                                  )}
+                                </li>
+                              );
+                            });
+                           })()}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
 
                 <h3>Tareas</h3>
 
                 <div className="tasks-panel">
-                  {!selectedRoom ? (
+                  {!selectedRoom && (
                     <div className="tasks-empty">
                       Selecciona una sala para ver sus tareas
                     </div>
-                  ) : tasks.length === 0 ? (
+                  )}
+
+            {tasks.length === 0 && (
                     <div className="tasks-empty">No hay tareas en esta sala 🧹</div>
-                  ) : (
+            )}
+
+            {tasks.length > 0 && (
                     <ul className="tasks-list">
                       {tasks.map((t) => (
                        <li key={t.id} className="task-item">
@@ -396,7 +438,7 @@ export default function Dashboard() {
                           <div className="task-title" style={t.completed ? { textDecoration: "line-through", opacity: 0.6 } : {}}>{t.title}</div>
 
                           <div className="task-meta" style={{ fontSize: "0.8em", color: "#666", marginTop: "4px" }}>
-                            Asignada a: {t.assignedToName || "Nadie"} | Creada por: {t.createdByName}
+                            Asignada a: {t.assignedToName || "Nadie"} | Creada por: {t.createdByName || "Usuario eliminado"}
                           </div>
 
                           <span
@@ -451,14 +493,16 @@ export default function Dashboard() {
                 </button>
               </aside>
             </section>
-           ) : (
-             /* Vista de grid */
-             <section className="dash-grid">
+            )}
+
+            
+              {/* Vista de grid */}
+              <section className="dash-grid">
                {/* 🟦 Salas */}
                <div className="dash-left">
                  <h2 className="dash-section-title">Mis Salas</h2>
                  <div className="rooms-grid">
-                   {rooms.length === 0 ? (
+                    {rooms.length === 0 && (
                      <div className="room-empty">
                        <div className="room-empty-icon">👥</div>
                        <div className="room-empty-title">Aún no tienes salas.</div>
@@ -466,8 +510,10 @@ export default function Dashboard() {
                          ¡Crea una para empezar a colaborar!
                        </div>
                      </div>
-                   ) : (
-                     rooms.map((r) => (
+          )}
+
+            {!selectedRoom && (
+                      {rooms.length > 0 && rooms.map((r) => (
                        <div key={r.id} className="room-card">
                          <div className="room-title">{r.name}</div>
                          <div className="room-sub">
@@ -488,8 +534,8 @@ export default function Dashboard() {
                            </button>
                          </div>
                        </div>
-                     ))
-                   )}
+                      )
+                    )}
                  </div>
                </div>
 
@@ -709,7 +755,7 @@ export default function Dashboard() {
                            setMessage("ID válido");
                          } else {
                            setMessage("ID inválido");
-                         }
+          )
                        }
                      }}
                      placeholder={searchMode === "username" ? "Ingresa username" : "Ingresa userId (24 hex)"}

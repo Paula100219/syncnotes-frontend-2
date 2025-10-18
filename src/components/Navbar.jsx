@@ -181,6 +181,8 @@ export default function Navbar({
   }, []);
 
   const handleLogout = () => {
+    const deletedU = localStorage.getItem("username");
+    if (deletedU) localStorage.setItem("__lastDeletedUsername", deletedU);
     localStorage.removeItem("auth_token");
     navigate("/login");
   };
@@ -289,6 +291,7 @@ export default function Navbar({
     try {
       setLoading(true);
       const id = await ensureUserId();
+      const uname = getCurrentUsername();
       const res = await fetch(`${API}/api/users/delete-user/${id}`, {
         method: "DELETE",
         headers: {
@@ -300,6 +303,7 @@ export default function Navbar({
         throw new Error(tryJson?.error || "Error al eliminar usuario");
       }
       alert(tryJson?.mensaje || "Usuario eliminado exitosamente");
+      localStorage.setItem("__lastDeletedUsername", uname);
       localStorage.removeItem("auth_token");
       localStorage.removeItem("username");
       navigate("/login");
