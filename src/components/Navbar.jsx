@@ -265,6 +265,51 @@ export default function Navbar({
     }
   };
 
+  const ensureUserId = async () => {
+    if (userId) return userId;
+    const uname = getCurrentUsername();
+    if (!uname) throw new Error("No hay usuario en sesión.");
+    const res = await fetch(`${API}/api/users/searchUser/${encodeURIComponent(uname)}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem("auth_token") || ""}` },
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error || "No se pudo obtener el usuario actual.");
+    }
+    const data = await res.json();
+    const u = data?.usuario;
+    if (!u?.id) throw new Error("No se pudo resolver el ID del usuario.");
+    setUserId(u.id);
+    return u.id;
+  };
+
+  const handleDeleteUser = async () => {
+    const ok = window.confirm("¿Seguro que deseas eliminar tu cuenta? Esta acción es irreversible.");
+    if (!ok) return;
+    try {
+      setLoading(true);
+      const id = await ensureUserId();
+      const res = await fetch(`${API}/api/users/delete-user/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("auth_token") || ""}`,
+        },
+      });
+      const tryJson = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(tryJson?.error || "Error al eliminar usuario");
+      }
+      alert(tryJson?.mensaje || "Usuario eliminado exitosamente");
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("username");
+      navigate("/login");
+    } catch (e) {
+      alert(e.message || "No se pudo eliminar el usuario.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (variant === "dashboard") {
     return (
       <>
@@ -297,7 +342,7 @@ export default function Navbar({
                  <DropItem onClick={openUpdateUser}>
                     ⚙️ Actualizar usuario
                   </DropItem>
-                 <DropItem onClick={(e) => e.preventDefault()}>🗑️ Eliminar usuario</DropItem>
+                  <DropItem onClick={handleDeleteUser}>🗑️ Eliminar usuario</DropItem>
                  <DropItem onClick={handleLogout}>🚪 Cerrar sesión</DropItem>
               </Dropdown>
             )}
