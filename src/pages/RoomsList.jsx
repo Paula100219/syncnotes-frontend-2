@@ -18,7 +18,6 @@ export default function RoomsList() {
   const [roomForm, setRoomForm] = useState({
     name: "",
     description: "",
-    isPublic: false,
   });
   const navigate = useNavigate();
 
@@ -178,15 +177,7 @@ export default function RoomsList() {
                 />
               </label>
 
-              <label className="checkbox">
-                <input
-                  type="checkbox"
-                  name="isPublic"
-                  checked={roomForm.isPublic}
-                  onChange={handleRoomChange}
-                />{" "}
-                Sala pública
-              </label>
+
 
               <div className="modal-actions">
                 <button type="submit" className="btn-primary">

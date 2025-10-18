@@ -25,13 +25,13 @@ const Left = styled.div`
 `;
 
 const LogoImg = styled.img`
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   object-fit: contain;
 `;
 
 const BrandText = styled.span`
-  font-size: 1.2rem;
+  font-size: 1.5rem;
   font-weight: 700;
   color: #fff;
 `;
@@ -47,10 +47,7 @@ const Button = styled.button`
   background-color: ${({ variant }) =>
     variant === "primary" ? "#2388ff" : "transparent"};
   color: ${({ variant }) => (variant === "primary" ? "#fff" : "#c9d1d9")};
-  border: ${({ variant }) =>
-    variant === "primary"
-      ? "none"
-      : "1px solid rgba(255, 255, 255, 0.2)"};
+  border: none;
   padding: 0.45rem 1rem;
   border-radius: 0.6rem;
   font-weight: 500;
@@ -69,7 +66,7 @@ const Button = styled.button`
 
 const IconButton = styled.button`
   background-color: rgba(255, 255, 255, 0.1);
-  border: none;
+  border: 1px solid rgba(255, 255, 255, 0.2);
   width: 36px;
   height: 36px;
   border-radius: 50%;
@@ -89,7 +86,10 @@ const Avatar = styled.img`
   border-radius: 50%;
   object-fit: cover;
   cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: ${({ variant }) =>
+    variant === "primary"
+      ? "none"
+      : "1px solid rgba(255, 255, 255, 0.2)"};
   transition: transform 0.2s ease, border-color 0.2s ease;
 
   &:hover {

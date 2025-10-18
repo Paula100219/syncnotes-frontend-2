@@ -94,8 +94,8 @@ export default function Login() {
   }
 
   const fields = [
-    { label: "Username", type: "text", name: "username", placeholder: "usuario" },
-    { label: "Contraseña", type: "password", name: "password", placeholder: "" },
+    { label: "Username", type: "text", name: "username", placeholder: "Nombre del usuario" },
+    { label: "Contraseña", type: "password", name: "password", placeholder: "Ingresar contraseña" },
   ];
 
   return (
@@ -114,7 +114,7 @@ export default function Login() {
               onSubmit={handleSubmit}
               formData={form}
               onChange={handleChange}
-              showForgotPassword={true}
+              showForgotPassword={false}
               linkText="¿No tienes una cuenta?"
               linkTo="/register"
               linkLabel="Regístrate aquí"
