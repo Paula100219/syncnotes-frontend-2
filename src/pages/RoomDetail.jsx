@@ -31,27 +31,37 @@ export default function RoomDetail() {
   });
   const [taskError, setTaskError] = useState("");
   const [taskLoading, setTaskLoading] = useState(false);
+   const [selectedTask, setSelectedTask] = useState(null);
+   const [showTaskModal, setShowTaskModal] = useState(false);
+   const [taskSelected, setTaskSelected] = useState(null);
 
   // Cargar datos
-  useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        const [userData, roomData, tasksData] = await Promise.all([
-          getMe(),
-          getRoomDetails(roomId),
-          getRoomTasks(roomId),
-        ]);
-        setMe(userData);
-        setRoom(roomData);
-        setTasks(tasksData);
-      } catch (e) {
-        setError(e?.message || "No se pudo cargar la sala.");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [roomId]);
+   useEffect(() => {
+     (async () => {
+       try {
+         setLoading(true);
+         const [userData, roomData, tasksData] = await Promise.all([
+           getMe(),
+           getRoomDetails(roomId),
+           getRoomTasks(roomId),
+         ]);
+         setMe(userData);
+         setRoom(roomData);
+         setTasks(tasksData);
+       } catch (e) {
+         setError(e?.message || "No se pudo cargar la sala.");
+       } finally {
+         setLoading(false);
+       }
+     })();
+   }, [roomId]);
+
+   // Cerrar modal con Esc
+   useEffect(() => {
+     const onKey = (e) => e.key === 'Escape' && setShowTaskModal(false);
+     window.addEventListener('keydown', onKey);
+     return () => window.removeEventListener('keydown', onKey);
+   }, []);
 
   // Reset modal
   const resetForm = () => {
@@ -279,29 +289,42 @@ export default function RoomDetail() {
             {tasks.length === 0 ? (
               <div className="tasks-empty">No hay tareas en esta sala</div>
             ) : (
-              <ul className="tasks-list">
-                {tasks.map((t) => (
-                  <li key={t.id} className="task-item">
-                    <div className="task-dot" style={{ background: t.priority === "HIGH" ? "#ef4444" : t.priority === "LOW" ? "#22c55e" : "#f59e0b" }} />
-                    <div className="task-title" style={t.completed ? { textDecoration: "line-through", opacity: 0.6 } : {}}>{t.title}</div>
-                    <div className="task-meta">
-                      Asignada a: {t.assignedToName || "Nadie"} | Creada por: {t.createdByName}
-                    </div>
-                    <span className={`badge ${t.priority === "HIGH" ? "badge-danger" : t.priority === "LOW" ? "badge-success" : "badge-warning"}`}>
-                      {t.priority}
-                    </span>
-                    {myRole !== 'VIEWER' && (
-                      <div className="task-actions">
-                        <button className="btn-ghost small" onClick={() => handleToggleComplete(t)} title={t.completed ? "Marcar como pendiente" : "Marcar como completada"}>
-                          {t.completed ? "↩️" : "✅"}
-                        </button>
-                        <button className="btn-ghost small" onClick={() => confirmDeleteTask(t)}>
-                          🗑️
-                        </button>
-                      </div>
-                    )}
-                  </li>
-                ))}
+               <ul className="tasks-list">
+                 {tasks.map((t) => (
+                   <li
+                     key={t.id}
+                     className="task-item"
+                     onClick={() => { setTaskSelected(t); setShowTaskModal(true); }}
+                   >
+                     {/* Lado izquierdo: punto + título */}
+                     <div className="task-main">
+                       <span className="dot" style={{ background: t.priority === "HIGH" ? "#ef4444" : t.priority === "LOW" ? "#22c55e" : "#f59e0b" }} />
+                       <span className="task-title" style={t.completed ? { textDecoration: "line-through", opacity: 0.6 } : {}}>{t.title}</span>
+                       <span className={`badge ${t.priority === "HIGH" ? "badge-danger" : t.priority === "LOW" ? "badge-success" : "badge-warning"}`}>
+                         {t.priority}
+                       </span>
+                     </div>
+                     {/* Lado derecho: acciones (no deben propagar el click) */}
+                     {myRole !== 'VIEWER' && (
+                       <div className="task-actions" onClick={(e) => e.stopPropagation()}>
+                         <button
+                           className="icon-btn"
+                           title={t.completed ? "Marcar como pendiente" : "Marcar como completada"}
+                           onClick={() => handleToggleComplete(t)}
+                         >
+                           {t.completed ? "↩️" : "✅"}
+                         </button>
+                         <button
+                           className="icon-btn"
+                           title="Eliminar tarea"
+                           onClick={() => handleDeleteTask(t)}
+                         >
+                           🗑️
+                         </button>
+                       </div>
+                     )}
+                   </li>
+                 ))}
               </ul>
             )}
           </div>
@@ -415,6 +438,28 @@ export default function RoomDetail() {
         </div>
       )}
 
+      {/* Modal Ver Tarea */}
+      {selectedTask && (
+        <div className="modal-backdrop">
+          <div className="modal">
+            <h2 className="modal-title">{selectedTask.title}</h2>
+            <div className="modal-form">
+              <p><strong>Descripción:</strong> {selectedTask.description?.trim() ? selectedTask.description : "Sin descripción"}</p>
+              <p><strong>Creada por:</strong> {selectedTask.createdByName}</p>
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setSelectedTask(null)}
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal Eliminar Tarea */}
       {openDeleteTaskModal && (
         <div className="modal-backdrop">
@@ -433,7 +478,31 @@ export default function RoomDetail() {
             </div>
           </div>
         </div>
-      )}
-    </div>
-  );
-}
+       )}
+
+       {/* Modal de Detalle */}
+       {showTaskModal && taskSelected && (
+         <div className="modal-backdrop" onClick={() => setShowTaskModal(false)}>
+           <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+             <div className="modal-header">
+               <h3 className="modal-title">{taskSelected.title}</h3>
+               <button className="btn-close" onClick={() => setShowTaskModal(false)}>×</button>
+             </div>
+             <div className="modal-body">
+               {taskSelected.description
+                 ? <p style={{whiteSpace: 'pre-wrap'}}>{taskSelected.description}</p>
+                 : <p style={{opacity:.7}}>Sin descripción.</p>}
+             </div>
+             {/* Opcional, pequeño pie informativo */}
+             {(taskSelected.createdByUsername || taskSelected.createdAt) && (
+               <div className="modal-footer meta">
+                 {taskSelected.createdByUsername && <span>Creada por: {taskSelected.createdByUsername}</span>}
+                 {taskSelected.createdAt && <span>  {new Date(taskSelected.createdAt).toLocaleString()}</span>}
+               </div>
+             )}
+           </div>
+         </div>
+       )}
+     </div>
+   );
+ }
