@@ -433,47 +433,29 @@ export default function RoomDetail() {
             <h2 className="modal-title">Añadir Miembro a la Sala</h2>
             <div className="modal-form">
               <label>
-                Buscar por:
-                <select value={searchMode} onChange={(e) => { setSearchMode(e.target.value); setUsernameInput(""); setUserIdSeleccionado(""); setMessage(""); }}>
-                  <option value="username">Username</option>
-                  <option value="id">ID</option>
-                </select>
-              </label>
-              <label>
-                {searchMode === "username" ? "Usuario:" : "User ID:"}
+                Usuario:
                 <div className="input-container">
                   <input
                     type="text"
                     value={usernameInput}
                     onChange={(e) => {
                       setUsernameInput(e.target.value);
-                      if (searchMode === "id") {
-                        const idValido = /^[a-f\d]{24}$/i.test(e.target.value);
-                        setMessage(idValido ? "" : "ID inválido");
-                      } else {
-                        setMessage("");
-                      }
+                      setMessage("");
                     }}
-                    placeholder={
-                      searchMode === "username"
-                        ? "Ingresa username"
-                        : "Ingresa userId (24 hex)"
-                    }
+                    placeholder="Ingresa username"
                   />
                 </div>
-                {searchMode === "username" && (
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    onClick={handleBuscar}
-                  >
-                    {searching ? "Buscando..." : "Buscar"}
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={handleBuscar}
+                >
+                  {searching ? "Buscando..." : "Buscar"}
+                </button>
               </label>
               {message && <p>{message}</p>}
               <div className="flex items-center justify-end gap-2 mt-4">
-                <button type="button" className="btn-secondary" onClick={() => { setOpenAddMemberModal(false); resetForm(); }}>
+                <button type="button" onClick={() => { setOpenAddMemberModal(false); resetForm(); }} style={{ backgroundColor: 'white', color: 'black', border: '1px solid #ccc', padding: '8px 14px', borderRadius: '10px', cursor: 'pointer' }}>
                   Cancelar
                 </button>
                 <button type="button" className="btn-primary" disabled={!userIdSeleccionado} onClick={submitAddMember}>
