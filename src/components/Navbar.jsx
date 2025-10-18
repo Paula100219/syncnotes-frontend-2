@@ -103,30 +103,44 @@ const Dropdown = styled.div`
   position: absolute;
   top: 56px;
   right: 0;
-  background: rgba(28, 36, 56, 0.96);
-  backdrop-filter: blur(6px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  background: linear-gradient(145deg, rgba(17, 24, 39, 0.98), rgba(11, 15, 25, 0.98));
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
   display: flex;
   flex-direction: column;
-  min-width: 180px;
+  min-width: 200px;
   z-index: 999;
-  animation: fadeIn 0.15s ease;
+  animation: fadeIn 0.2s ease;
+  overflow: hidden;
 `;
 
 const DropItem = styled.button`
   background: none;
   border: none;
-  color: #f1f1f1;
+  color: #e6eaf2;
   text-align: left;
-  padding: 10px 14px;
+  padding: 12px 16px;
   cursor: pointer;
   font-size: 0.95rem;
-  transition: background 0.15s ease;
+  font-weight: 500;
+  transition: all 0.2s ease;
 
   &:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(22, 119, 255, 0.1);
+    color: #1677ff;
+    transform: translateX(2px);
+  }
+
+  &:first-child {
+    border-top-left-radius: 14px;
+    border-top-right-radius: 14px;
+  }
+
+  &:last-child {
+    border-bottom-left-radius: 14px;
+    border-bottom-right-radius: 14px;
   }
 `;
 
@@ -165,6 +179,9 @@ export default function Navbar({
   // 🔹 Estados para actualizar usuario
   const API = (import.meta && import.meta.env && import.meta.env.VITE_API_BASE) || "";
   const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [showDeleteSuccessModal, setShowDeleteSuccessModal] = useState(false);
+  const [deleteMessage, setDeleteMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState(null);
   const [form, setForm] = useState({ name: "", username: "" });
@@ -286,8 +303,6 @@ export default function Navbar({
   };
 
   const handleDeleteUser = async () => {
-    const ok = window.confirm("¿Seguro que deseas eliminar tu cuenta? Esta acción es irreversible.");
-    if (!ok) return;
     try {
       setLoading(true);
       const id = await ensureUserId();
@@ -302,11 +317,11 @@ export default function Navbar({
       if (!res.ok) {
         throw new Error(tryJson?.error || "Error al eliminar usuario");
       }
-      alert(tryJson?.mensaje || "Usuario eliminado exitosamente");
+      setDeleteMessage(tryJson?.mensaje || "Usuario eliminado exitosamente");
+      setShowDeleteSuccessModal(true);
       localStorage.setItem("__lastDeletedUsername", uname);
       localStorage.removeItem("auth_token");
       localStorage.removeItem("username");
-      navigate("/login");
     } catch (e) {
       alert(e.message || "No se pudo eliminar el usuario.");
     } finally {
@@ -342,12 +357,12 @@ export default function Navbar({
             />
             {menuOpen && (
               <Dropdown>
-                <DropItem onClick={() => navigate("/perfil")}>👤 Perfil</DropItem>
-                 <DropItem onClick={openUpdateUser}>
-                    ⚙️ Actualizar usuario
-                  </DropItem>
-                  <DropItem onClick={handleDeleteUser}>🗑️ Eliminar usuario</DropItem>
-                 <DropItem onClick={handleLogout}>🚪 Cerrar sesión</DropItem>
+                <DropItem onClick={() => navigate("/perfil")}>Perfil</DropItem>
+                  <DropItem onClick={openUpdateUser}>
+                     Actualizar usuario
+                   </DropItem>
+                   <DropItem onClick={handleDeleteUser}>Eliminar usuario</DropItem>
+                  <DropItem onClick={handleLogout}>Cerrar sesión</DropItem>
               </Dropdown>
             )}
           </div>
@@ -384,6 +399,70 @@ export default function Navbar({
                 </button>
               </div>
             </form>
+          </ModalContent>
+        </Modal>
+      )}
+
+      {showDeleteConfirmModal && (
+        <Modal onClick={() => setShowDeleteConfirmModal(false)}>
+          <ModalContent onClick={(e) => e.stopPropagation()}>
+            <h3>Confirmar Eliminación</h3>
+            <p style={{ margin: '1rem 0', textAlign: 'center' }}>
+              ¿Seguro que deseas eliminar tu cuenta? Esta acción es irreversible.
+            </p>
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+              <button
+                onClick={async () => { setShowDeleteConfirmModal(false); await handleDeleteUser(); }}
+                disabled={loading}
+                style={{
+                  backgroundColor: '#dc3545',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '0.5rem',
+                  cursor: 'pointer'
+                }}
+              >
+                {loading ? "Eliminando..." : "Sí, eliminar"}
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirmModal(false)}
+                style={{
+                  backgroundColor: '#6c757d',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '0.5rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Cancelar
+              </button>
+            </div>
+          </ModalContent>
+        </Modal>
+      )}
+
+      {showDeleteSuccessModal && (
+        <Modal onClick={() => { setShowDeleteSuccessModal(false); navigate("/login"); }}>
+          <ModalContent onClick={(e) => e.stopPropagation()}>
+            <h3>Cuenta Eliminada</h3>
+            <p style={{ margin: '1rem 0', textAlign: 'center' }}>{deleteMessage}</p>
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <button
+                onClick={() => { setShowDeleteSuccessModal(false); navigate("/login"); }}
+                style={{
+                  backgroundColor: '#1677ff',
+                  color: 'white',
+                  border: 'none',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '0.5rem',
+                  cursor: 'pointer'
+                }}
+              >
+                Aceptar
+              </button>
+            </div>
           </ModalContent>
         </Modal>
       )}

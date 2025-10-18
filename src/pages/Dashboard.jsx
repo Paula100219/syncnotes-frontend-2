@@ -485,9 +485,9 @@ export default function Dashboard() {
                   )}
                 </div>
                 <button
-                  className="btn-secondary"
+                  className="btn-panel"
                   onClick={() => setSelectedRoom(null)}
-                  style={{ marginTop: '20px' }}
+                  style={{ marginTop: '20px', width: 'auto', padding: '10px 16px' }}
                 >
                   ← Volver a Mis Salas
                 </button>
