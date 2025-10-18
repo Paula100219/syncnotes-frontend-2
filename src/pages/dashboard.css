@@ -478,3 +478,26 @@
   color: #e6eaf2;
   outline: none;
 }
+
+.badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 0.8em;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.badge-owner {
+  background: #fbbf24;
+  color: #000;
+}
+
+.badge-editor {
+  background: #10b981;
+  color: #fff;
+}
+
+.badge-viewer {
+  background: #6b7280;
+  color: #fff;
+}

@@ -217,7 +217,7 @@ export function addMember(roomId, userId, role) {
 
 // ✅ Buscar usuario por username
 export function searchUser(username) {
-  return apiGet(`/api/users/by-username/${encodeURIComponent(username)}`);
+  return apiGet(`/api/users/searchUser/${encodeURIComponent(username)}`);
 }
 
 // ✅ Actualizar rol de miembro

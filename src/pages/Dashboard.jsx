@@ -48,13 +48,14 @@ export default function Dashboard() {
    const [openDeleteTaskModal, setOpenDeleteTaskModal] = useState(false);
    const [taskToDelete, setTaskToDelete] = useState(null);
 
-      const [openAddMemberModal, setOpenAddMemberModal] = useState(false);
-      const [searchMode, setSearchMode] = useState("username"); // "username" or "id"
-      const [usernameInput, setUsernameInput] = useState("");
-      const [userIdSeleccionado, setUserIdSeleccionado] = useState("");
-      const [message, setMessage] = useState("");
-      const [searching, setSearching] = useState(false);
-      const [adding, setAdding] = useState(false);
+       const [openAddMemberModal, setOpenAddMemberModal] = useState(false);
+       const [searchMode, setSearchMode] = useState("username"); // "username" or "id"
+       const [usernameInput, setUsernameInput] = useState("");
+       const [userIdSeleccionado, setUserIdSeleccionado] = useState("");
+       const [usuarioEncontrado, setUsuarioEncontrado] = useState(null);
+       const [message, setMessage] = useState("");
+       const [searching, setSearching] = useState(false);
+       const [adding, setAdding] = useState(false);
 
   // 🔹 Cargar usuario
   useEffect(() => {
@@ -146,70 +147,85 @@ export default function Dashboard() {
 
 
 
-     const handleBuscar = async () => {
-       const trimmed = usernameInput.trim();
-       if (!trimmed) {
-         alert("Ingresa un username");
-         return;
-       }
-      setSearching(true);
-      setMessage("Buscando usuario...");
-      try {
-        const user = await searchUser(trimmed);
-        if (user && user._id) {
-          setUserIdSeleccionado(user._id);
-          setMessage(`Usuario encontrado: ${user.username}`);
-        } else {
-          setMessage("Usuario no encontrado");
-          setUserIdSeleccionado("");
+    const handleBuscar = async () => {
+        const trimmed = usernameInput.trim();
+        if (!trimmed) {
+          setMessage("Ingresa un username");
+          return;
         }
-      } catch (err) {
-        if (err.status === 404) {
-          setMessage("Usuario no encontrado");
-        } else {
-          setMessage("Error al buscar usuario");
-        }
-        setUserIdSeleccionado("");
-      } finally {
-        setSearching(false);
-      }
-    };
-
-    const submitAddMember = async () => {
-      if (!selectedRoom) {
-        alert("Selecciona una sala primero");
-        return;
-      }
-      if (!userIdSeleccionado) {
-        alert("Primero busca un usuario");
-        return;
-      }
-      setAdding(true);
-      try {
-        await addMember(selectedRoom.id, userIdSeleccionado, "EDITOR");
-        alert("Miembro añadido correctamente");
-        setOpenAddMemberModal(false);
-        setUsernameInput("");
-        setUserIdSeleccionado("");
-        setMessage("");
-        // Refrescar miembros
-        try {
-          const roomDetails = await getRoomDetails(selectedRoom.id);
-          setSelectedRoom(roomDetails);
-        } catch (refreshErr) {
-          console.error("Error al refrescar miembros:", refreshErr);
-        }
+       setSearching(true);
+       setMessage("Buscando usuario...");
+       try {
+         const response = await searchUser(trimmed);
+         if (response && response.usuario && response.usuario.id) {
+           setUserIdSeleccionado(response.usuario.id);
+           setUsuarioEncontrado(response.usuario);
+           setMessage("Usuario encontrado correctamente.");
+         } else {
+           setMessage("Usuario no encontrado");
+           setUserIdSeleccionado("");
+           setUsuarioEncontrado(null);
+         }
        } catch (err) {
-         if (err.status === 401) {
-           alert("Sesión expirada. Redirigiendo a login.");
+         if (err.status === 404) {
+           setMessage("Usuario no encontrado");
+         } else if (err.status === 401 || err.status === 403) {
+           setMessage("Sesión expirada. Redirigiendo a login.");
            window.location.href = "/login";
          } else {
-           alert(err.message || "No se pudo añadir el miembro");
+           setMessage("Error al buscar usuario");
          }
+         setUserIdSeleccionado("");
+         setUsuarioEncontrado(null);
        } finally {
-        setAdding(false);
-      }
-    };
+         setSearching(false);
+       }
+     };
+
+     const submitAddMember = async () => {
+       if (!selectedRoom) {
+         setMessage("Selecciona una sala primero");
+         return;
+       }
+       if (!userIdSeleccionado) {
+         setMessage("Primero busca un usuario");
+         return;
+       }
+       setAdding(true);
+       try {
+         await addMember(selectedRoom.id, userIdSeleccionado, "EDITOR");
+         setMessage("Miembro añadido correctamente");
+         setOpenAddMemberModal(false);
+         resetForm();
+         // Refrescar miembros
+         try {
+           const roomDetails = await getRoomDetails(selectedRoom.id);
+           setSelectedRoom(roomDetails);
+         } catch (refreshErr) {
+           console.error("Error al refrescar miembros:", refreshErr);
+         }
+        } catch (err) {
+          if (err.status === 401 || err.status === 403) {
+            setMessage("Sesión expirada o sin permisos. Redirigiendo a login.");
+            window.location.href = "/login";
+          } else if (err.status === 400) {
+            setMessage(err.message || "Error en la solicitud");
+          } else {
+            setMessage(err.message || "No se pudo añadir el miembro");
+          }
+        } finally {
+         setAdding(false);
+       }
+     };
+
+     const resetForm = () => {
+       setUsernameInput("");
+       setUserIdSeleccionado("");
+       setUsuarioEncontrado(null);
+       setMessage("");
+       setSearching(false);
+       setAdding(false);
+     };
 
    // 🔹 Cambiar rol de miembro
    const handleChangeRole = async (memberId, newRole) => {
@@ -353,32 +369,37 @@ export default function Dashboard() {
 
                  {selectedRoom && (
                    <div className="members-list">
-                     <h3>Miembros</h3>
-                      <ul>
-                        {selectedRoom.members?.map((m) => {
-                          const roleMap = {
-                            OWNER: "Propietario",
-                            EDITOR: "Miembro",
-                            VIEWER: "Lector",
-                          };
-                          return (
-                            <li key={m.userId}>
-                              <div>
-                                <strong>{m.username}</strong> <span>({roleMap[m.role] || m.role})</span>
-                              </div>
-                              {selectedRoom.members?.find(mem => mem.userId === me?.user?.id)?.role === "OWNER" && m.role !== "OWNER" && (
-                                <select
-                                  value={m.role}
-                                  onChange={(e) => handleChangeRole(m.userId, e.target.value)}
-                                >
-                                  <option value="EDITOR">Miembro</option>
-                                  <option value="VIEWER">Lector</option>
-                                </select>
-                              )}
-                            </li>
-                          );
-                        })}
-                      </ul>
+                      <h3>Miembros ({selectedRoom.members?.length || 0})</h3>
+                       <ul>
+                         {selectedRoom.members?.map((m) => {
+                           const roleMap = {
+                             OWNER: "Propietario",
+                             EDITOR: "Miembro",
+                             VIEWER: "Lector",
+                           };
+                           const badgeClass = {
+                             OWNER: "badge-owner",
+                             EDITOR: "badge-editor",
+                             VIEWER: "badge-viewer",
+                           };
+                           return (
+                             <li key={m.userId}>
+                               <div>
+                                 <strong>{m.username}</strong> <span className={`badge ${badgeClass[m.role] || ""}`}>{roleMap[m.role] || m.role}</span>
+                               </div>
+                               {selectedRoom.members?.find(mem => mem.userId === me?.user?.id)?.role === "OWNER" && m.role !== "OWNER" && (
+                                 <select
+                                   value={m.role}
+                                   onChange={(e) => handleChangeRole(m.userId, e.target.value)}
+                                 >
+                                   <option value="EDITOR">Miembro</option>
+                                   <option value="VIEWER">Lector</option>
+                                 </select>
+                               )}
+                             </li>
+                           );
+                         })}
+                       </ul>
                    </div>
                  )}
 
@@ -623,79 +644,81 @@ export default function Dashboard() {
         </div>
       )}
 
-        {/* 🔹 Modal Añadir Miembro */}
-        {openAddMemberModal && selectedRoom && (
-          <div className="modal-backdrop">
-            <div className="modal">
-              <h2 className="modal-title">Añadir Miembro a la Sala</h2>
-              <div className="modal-form">
-                <label>
-                  Buscar por:
-                  <select
-                    value={searchMode}
-                    onChange={(e) => {
-                      const newMode = e.target.value;
-                      setSearchMode(newMode);
-                      setUsernameInput("");
-                      setUserIdSeleccionado("");
-                      setMessage("");
-                    }}
-                  >
-                    <option value="username">Username</option>
-                    <option value="id">ID</option>
-                  </select>
-                </label>
-                <label>
-                  {searchMode === "username" ? "Usuario:" : "User ID:"}
-                  <input
-                    type="text"
-                    value={usernameInput}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setUsernameInput(val);
-                      if (searchMode === "id") {
-                        if (/^[a-fA-F0-9]{24}$/.test(val)) {
-                          setUserIdSeleccionado(val);
-                          setMessage("ID válido");
-                        } else {
-                          setUserIdSeleccionado("");
-                          setMessage("ID inválido");
-                        }
-                      } else {
-                        setUserIdSeleccionado("");
-                        setMessage("");
-                      }
-                    }}
-                    placeholder={searchMode === "username" ? "Ingresa username" : "Ingresa userId (24 hex)"}
-                  />
-                  {searchMode === "username" && (
+         {/* 🔹 Modal Añadir Miembro */}
+         {openAddMemberModal && selectedRoom && (
+           <div className="modal-backdrop">
+             <div className="modal">
+               <h2 className="modal-title">Añadir Miembro a la Sala</h2>
+               <div className="modal-form">
+                 <label>
+                   Buscar por:
+                   <select
+                     value={searchMode}
+                     onChange={(e) => {
+                       const newMode = e.target.value;
+                       setUsernameInput("");
+                       setUserIdSeleccionado("");
+                       setUsuarioEncontrado(null);
+                       setMessage("");
+                     }}
+                   >
+                     <option value="username">Username</option>
+                     <option value="id">ID</option>
+                   </select>
+                 </label>
+                 <label>
+                   {searchMode === "username" ? "Usuario:" : "User ID:"}
+                   <input
+                     type="text"
+                     value={usernameInput}
+                     onChange={(e) => {
+                       const val = e.target.value;
+                       setUsernameInput(val);
+                       setMessage("");
+                       setUserIdSeleccionado("");
+                       setUsuarioEncontrado(null);
+                       if (searchMode === "id") {
+                         if (/^[a-fA-F0-9]{24}$/.test(val)) {
+                           setUserIdSeleccionado(val);
+                           setMessage("ID válido");
+                         } else {
+                           setMessage("ID inválido");
+                         }
+                       }
+                     }}
+                     placeholder={searchMode === "username" ? "Ingresa username" : "Ingresa userId (24 hex)"}
+                   />
+                   {searchMode === "username" && (
+                     <button
+                       type="button"
+                       disabled={searching}
+                       onClick={handleBuscar}
+                     >
+                       {searching ? "Buscando..." : "Buscar"}
+                     </button>
+                   )}
+                 </label>
+                  {message && <p>{message}</p>}
+                  <div className="flex items-center justify-end gap-2 mt-4">
                     <button
                       type="button"
-                      disabled={searching}
-                      onClick={handleBuscar}
+                      className="btn-secondary"
+                      onClick={() => {
+                        setOpenAddMemberModal(false);
+                        resetForm();
+                      }}
                     >
-                      {searching ? "Buscando..." : "Buscar"}
+                      Cancelar
                     </button>
-                  )}
-                </label>
-                {message && <p>{message}</p>}
-                <div className="modal-actions">
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    disabled={adding || !userIdSeleccionado}
-                    onClick={submitAddMember}
-                  >
-                    {adding ? "Añadiendo..." : "Añadir Miembro"}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    onClick={() => setOpenAddMemberModal(false)}
-                  >
-                    Cancelar
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      disabled={!userIdSeleccionado}
+                      onClick={submitAddMember}
+                    >
+                      Añadir Miembro
+                    </button>
+                  </div>
               </div>
             </div>
           </div>
