@@ -1,65 +1,111 @@
-# Plan de Implementación Visual de Login y Registro
+# Documentación Completa del Proyecto SyncNotes
 
-## Información Recopilada
-- Proyecto React con Vite y TailwindCSS.
-- Archivos existentes: Login.jsx, Register.jsx con lógica de formularios y conexiones al backend.
-- Necesidad de rediseño visual con dark mode, minimalismo y animaciones.
-- Mantener intacta la lógica de estado, manejo de formularios y conexiones al backend.
+## Descripción General del Sistema
+SyncNotes es una aplicación web colaborativa para la gestión de notas y tareas en equipos. Permite a los usuarios crear salas de trabajo, asignar tareas, gestionar miembros y mantener un historial de actividades. El sistema está dividido en un frontend desarrollado en React y un backend en Spring Boot con MongoDB, facilitando la colaboración en tiempo real y la organización de proyectos.
 
-## Plan Detallado
-- [x] Instalar styled-components.
-- [x] Crear componente Navbar con variantes para login y register.
-- [x] Crear componentes estilizados para inputs y botones con animaciones.
-- [x] Crear componente AuthForm para el formulario central.
-- [x] Actualizar Login.jsx con nuevo diseño visual.
-- [x] Actualizar Register.jsx con nuevo diseño visual.
-- [x] Implementar animaciones de transición entre pantallas.
-- [ ] Probar responsividad y animaciones.
+## Principales Funcionalidades
+- **Autenticación**: Registro e inicio de sesión de usuarios con JWT.
+- **Salas**: Creación de salas públicas o privadas para organizar proyectos.
+- **Tareas**: Creación, asignación, actualización y eliminación de tareas dentro de salas.
+- **Miembros**: Gestión de miembros en salas, con roles (Propietario, Administrador, Miembro, Lector).
+- **Mensajes**: Comunicación dentro de salas (aunque no implementado en el frontend actual).
+- **Historial**: Registro de cambios en salas, tareas y miembros.
 
-## Archivos a Editar
-- src/pages/Login.jsx
-- src/pages/Register.jsx
-- Crear: src/components/Navbar.jsx
-- Crear: src/components/AuthForm.jsx
-- Crear: src/components/StyledInput.jsx
-- Crear: src/components/StyledButton.jsx
+## Arquitectura del Sistema
 
-## Pasos de Seguimiento
-- [ ] Verificar cambios en archivos.
-- [ ] Confirmar con usuario para modificaciones adicionales.
+### Frontend (React)
+- **Tecnologías**: React 19, Vite, TailwindCSS, Styled Components, React Router DOM.
+- **Estructura**:
+  - `src/pages/`: Páginas principales (Login, Register, Dashboard, RoomDetail, etc.).
+  - `src/components/`: Componentes reutilizables (Navbar, AuthForm, Button, etc.).
+  - `src/services/`: Lógica de API (api.js para llamadas al backend).
+- **Características**: Interfaz oscura y moderna, responsiva, con animaciones y transiciones. Manejo de estado local y navegación protegida.
 
-## Documentación del Proyecto
+### Backend (Spring Boot con MongoDB)
+- **Tecnologías**: Spring Boot, Java 21, MongoDB, JWT para autenticación.
+- **Estructura**: API REST con endpoints para usuarios, salas, tareas, mensajes e historial.
+- **Características**: Autenticación segura, gestión de roles, operaciones CRUD completas, documentación con Swagger UI.
 
-### Descripción General
-SyncNotes es una aplicación web para tomar notas, construida con React y Vite. Incluye páginas para iniciar sesión, registrarse y una página principal. Usa estilos modernos con Tailwind CSS y componentes estilizados para una interfaz oscura y elegante.
+## Flujo General entre Frontend y Backend
+1. **Autenticación**: Usuario se registra o inicia sesión en el frontend, enviando datos al backend. Backend valida y retorna un token JWT.
+2. **Navegación Protegida**: Frontend usa el token para acceder a rutas protegidas, verificando con `/api/auth/me`.
+3. **Gestión de Salas**: Usuario crea salas, las lista, y accede a detalles. Backend maneja la lógica de permisos y roles.
+4. **Tareas y Miembros**: Dentro de una sala, el frontend permite crear tareas, gestionar miembros y ver historial, sincronizando con el backend.
+5. **Comunicación**: Todas las interacciones pasan por la API REST, con manejo de errores y estados de carga en el frontend.
 
-### Librerías Usadas
-- **React**: Base de la interfaz de usuario, permite crear componentes reutilizables.
-- **React DOM**: Maneja la renderización en el navegador.
-- **React Router DOM**: Navegación entre páginas.
-- **Styled Components**: Estilos CSS en JavaScript para componentes elegantes.
-- **Tailwind CSS**: Sistema de clases para diseños rápidos y responsivos.
-- **Vite**: Herramienta de desarrollo rápida.
-- **ESLint**: Revisión de código para mantenerlo limpio.
+## Tecnologías Utilizadas
+- **Frontend**:
+  - React: Biblioteca para interfaces de usuario.
+  - Vite: Herramienta de desarrollo rápida.
+  - TailwindCSS: Framework CSS utilitario.
+  - Styled Components: Estilos CSS en JavaScript.
+  - React Router DOM: Navegación entre páginas.
+  - ESLint: Linting de código.
+- **Backend**:
+  - Spring Boot: Framework para aplicaciones Java.
+  - MongoDB: Base de datos NoSQL.
+  - JWT: Autenticación basada en tokens.
+  - Swagger: Documentación de API.
+- **Herramientas Generales**:
+  - Git: Control de versiones.
+  - Node.js: Entorno de ejecución para el frontend.
+  - Java 21: Para el backend.
 
-### Archivos Principales
-- **TODO.md**: Portada del proyecto, explica qué es y cómo usarlo.
-- **package.json**: Lista de ingredientes (librerías) necesarias.
-- **index.html**: Página base que carga la app.
-- **src/main.jsx**: Punto de inicio de React.
-- **src/App.jsx**: Mapa de rutas (login, registro, inicio).
-- **src/pages/Home.jsx**: Página principal después de login.
-- **src/pages/Login.jsx**: Página de entrada con formulario.
-- **src/pages/Register.jsx**: Página de registro con formulario.
-- **src/pages/Login.css**: Estilos oscuros para login y registro.
-- **src/components/Navbar.jsx**: Barra de navegación con logo y botones.
-- **src/components/AuthForm.jsx**: Formulario reutilizable para login y registro.
-- **src/components/Button.jsx, FormInput.jsx, StyledButton.jsx, StyledInput.jsx**: Componentes para botones e inputs.
-- **src/services/api.js**: Funciones para conectarse al servidor (login, registro).
+## Pasos para Ejecutar el Proyecto
+### Prerrequisitos
+- Node.js (versión 18 o superior).
+- Java 21.
+- MongoDB corriendo localmente o en la nube.
+- Backend corriendo en `http://localhost:8081`.
 
-### Lógica de Login y Register
-- **Login**: Recoge usuario y contraseña, envía al servidor, si ok guarda token y va a /home.
-- **Register**: Recoge nombre, usuario y contraseña, crea cuenta, muestra mensaje y va a login.
+### Instalación y Ejecución
+1. **Clonar el repositorio**:
+   ```
+   git clone <url-del-repo>
+   cd syncnotes-frontend-2
+   ```
+
+2. **Instalar dependencias del frontend**:
+   ```
+   npm install
+   ```
+
+3. **Configurar variables de entorno**:
+   - Crear un archivo `.env` en la raíz con:
+     ```
+     VITE_API_BASE=http://localhost:8081
+     ```
+
+4. **Ejecutar el frontend**:
+   ```
+   npm run dev
+   ```
+   - Abre en `http://localhost:5173` (por defecto).
+
+5. **Ejecutar el backend** (en otro terminal):
+   - Asegúrate de que el backend esté configurado y corriendo en `http://localhost:8081`.
+   - Consulta la documentación del backend para detalles.
+
+6. **Acceder a la aplicación**:
+   - Ve a `http://localhost:5173/login` para iniciar sesión.
+   - Regístrate si es necesario, luego accede al dashboard.
+
+### Comandos Útiles
+- `npm run build`: Construir para producción.
+- `npm run preview`: Vista previa del build.
+- `npm run lint`: Revisar código con ESLint.
+
+## Posibles Mejoras Futuras
+- **Mensajes en Tiempo Real**: Implementar WebSockets para chat en vivo.
+- **Notificaciones**: Sistema de notificaciones push para tareas y menciones.
+- **Archivos Adjuntos**: Permitir subir archivos a tareas o mensajes.
+- **Calendario**: Vista de calendario para fechas de vencimiento de tareas.
+- **Internacionalización**: Soporte para múltiples idiomas.
+- **Pruebas**: Añadir tests unitarios e integración (Jest, Cypress).
+- **PWA**: Convertir en Progressive Web App para uso offline.
+- **Análisis**: Integrar herramientas de analytics para uso de la app.
+- **Seguridad**: Implementar 2FA y encriptación adicional.
+- **UI/UX**: Mejoras en accesibilidad y diseño móvil.
 
 ### Notas
 - El proyecto usa un backend separado para autenticación y datos.

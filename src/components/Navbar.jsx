@@ -3,6 +3,19 @@ import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import logoPng from "../assets/logo.png";
 
+// Helpers MINIMOS y SEGUROS (colócalos arriba del componente, en el mismo archivo):
+
+const getInitialsFromLS = () => {
+  const val =
+    (localStorage.getItem("name") || localStorage.getItem("username") || "U")
+      .toString()
+      .trim();
+  if (!val) return "U";
+  const parts = val.split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return val.slice(0, 2).toUpperCase();
+};
+
 const Nav = styled.nav`
   display: flex;
   justify-content: space-between;
@@ -80,22 +93,52 @@ const IconButton = styled.button`
   }
 `;
 
-const Avatar = styled.img`
+const Avatar = styled.div`
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  object-fit: cover;
+  background: linear-gradient(135deg, #1677ff, #0056cc);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 14px;
   cursor: pointer;
-  border: ${({ variant }) =>
-    variant === "primary"
-      ? "none"
-      : "1px solid rgba(255, 255, 255, 0.2)"};
+  border: 1px solid rgba(255, 255, 255, 0.2);
   transition: transform 0.2s ease, border-color 0.2s ease;
 
   &:hover {
     transform: scale(1.05);
     border-color: rgba(255, 255, 255, 0.6);
   }
+`;
+
+const AvatarTrigger = styled.button`
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+`;
+
+const AvatarInitials = styled.div`
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: #e5e7eb;
+  background: #374151;
 `;
 
 // 🔹 Estilos del menú desplegable
@@ -171,10 +214,14 @@ export default function Navbar({
   variant = "login",
   onCreateRoom,
   onViewPublicRooms,
+  toggleUserMenu,
 }) {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
+  const [initials, setInitials] = useState(getInitialsFromLS());
+
+  const safeToggleUserMenu = typeof toggleUserMenu === "function" ? toggleUserMenu : () => setMenuOpen(!menuOpen);
 
   // 🔹 Estados para actualizar usuario
   const API = (import.meta && import.meta.env && import.meta.env.VITE_API_BASE) || "";
@@ -200,14 +247,16 @@ export default function Navbar({
   const handleLogout = () => {
     const deletedU = localStorage.getItem("username");
     if (deletedU) localStorage.setItem("__lastDeletedUsername", deletedU);
-    localStorage.removeItem("auth_token");
+    localStorage.removeItem("token");
+    localStorage.removeItem("username");
+    localStorage.removeItem("name");
     navigate("/login");
   };
 
   const getCurrentUsername = () => {
     const ls = localStorage.getItem("username");
     if (ls) return ls;
-    const t = localStorage.getItem("auth_token");
+    const t = localStorage.getItem("token");
     if (t) {
       try {
         const payload = JSON.parse(atob(t.split(".")[1]));
@@ -225,7 +274,7 @@ export default function Navbar({
     try {
       setLoading(true);
       const res = await fetch(`${API}/api/users/searchUser/${encodeURIComponent(uname)}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("auth_token") || ""}` },
+        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -263,7 +312,7 @@ export default function Navbar({
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("auth_token") || ""}`,
+          Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
         },
         body: JSON.stringify(body),
       });
@@ -271,12 +320,19 @@ export default function Navbar({
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || "Error al actualizar usuario");
       }
-      alert("Usuario actualizado correctamente.");
-      setShowUpdateModal(false);
-      const current = getCurrentUsername();
-      if (body.username && current && body.username !== current) {
-        localStorage.setItem("username", body.username);
-      }
+       alert("Usuario actualizado correctamente.");
+       setShowUpdateModal(false);
+        const current = getCurrentUsername();
+        if (body.username && current && body.username !== current) {
+          localStorage.setItem("username", body.username);
+        }
+        if (body.name) {
+          const currentName = localStorage.getItem("name");
+          if (body.name !== currentName) {
+            localStorage.setItem("name", body.name);
+          }
+        }
+        setInitials(getInitialsFromLS());
     } catch (e) {
       alert(e.message || "Error al actualizar usuario");
     } finally {
@@ -310,7 +366,7 @@ export default function Navbar({
       const res = await fetch(`${API}/api/users/delete-user/${id}`, {
         method: "DELETE",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("auth_token") || ""}`,
+          Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
         },
       });
       const tryJson = await res.json().catch(() => ({}));
@@ -319,9 +375,10 @@ export default function Navbar({
       }
       setDeleteMessage(tryJson?.mensaje || "Usuario eliminado exitosamente");
       setShowDeleteSuccessModal(true);
-      localStorage.setItem("__lastDeletedUsername", uname);
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("username");
+       localStorage.setItem("__lastDeletedUsername", uname);
+       localStorage.removeItem("token");
+       localStorage.removeItem("username");
+       localStorage.removeItem("name");
     } catch (e) {
       alert(e.message || "No se pudo eliminar el usuario.");
     } finally {
@@ -348,24 +405,26 @@ export default function Navbar({
           <Button onClick={onViewPublicRooms}>Ver salas públicas</Button>
           <IconButton title="Notificaciones">🔔</IconButton>
 
-          {/* 🔹 Avatar con menú desplegable */}
-          <div style={{ position: "relative" }}>
-            <Avatar
-              src="https://i.pravatar.cc/36"
-              alt="perfil"
-              onClick={() => setMenuOpen(!menuOpen)}
-            />
-            {menuOpen && (
-              <Dropdown>
-                <DropItem onClick={() => navigate("/perfil")}>Perfil</DropItem>
-                  <DropItem onClick={openUpdateUser}>
-                     Actualizar usuario
-                   </DropItem>
-                   <DropItem onClick={handleDeleteUser}>Eliminar usuario</DropItem>
-                  <DropItem onClick={handleLogout}>Cerrar sesión</DropItem>
-              </Dropdown>
-            )}
-          </div>
+            {/* 🔹 Avatar con menú desplegable */}
+            <div style={{ position: "relative" }}>
+              <AvatarTrigger
+                type="button"
+                onClick={safeToggleUserMenu}
+                aria-label="Abrir menú de usuario"
+              >
+                 <AvatarInitials>{initials}</AvatarInitials>
+              </AvatarTrigger>
+             {menuOpen && (
+               <Dropdown>
+                 <DropItem onClick={() => navigate("/perfil")}>Perfil</DropItem>
+                   <DropItem onClick={openUpdateUser}>
+                      Actualizar usuario
+                    </DropItem>
+                    <DropItem onClick={handleDeleteUser}>Eliminar usuario</DropItem>
+                   <DropItem onClick={handleLogout}>Cerrar sesión</DropItem>
+               </Dropdown>
+             )}
+           </div>
         </Right>
       </Nav>
 

@@ -53,11 +53,9 @@ export default function Login() {
     setLoading(true);
     try {
       const body = await login(form.username, form.password);
-      // guarda nombre/username (ya lo hace api.js, pero por si acaso)
-      if (body?.username) {
-        localStorage.setItem("username", body.username);
-        localStorage.setItem("name", body.name || body.username);
-      }
+      localStorage.setItem("token", body.token);
+      localStorage.setItem("username", body.user?.username || form.username);
+      localStorage.setItem("name", body.user?.name || "");
       navigate("/dashboard"); // ⬅️ al dashboard
     } catch (err) {
       const status =
