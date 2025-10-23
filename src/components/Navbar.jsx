@@ -2,7 +2,7 @@ import styled from "styled-components";
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import logoPng from "../assets/logo.png";
-import { searchUser, updateUser, makeUrl, authHeaders } from "../services/Api";
+import { searchUser, updateUser, makeUrl, authHeaders, getMyIdFromMe } from "../services/Api";
 
 // Helpers MINIMOS y SEGUROS (colócalos arriba del componente, en el mismo archivo):
 
@@ -15,6 +15,22 @@ const getInitialsFromLS = () => {
   const parts = val.split(/\s+/).filter(Boolean);
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
   return val.slice(0, 2).toUpperCase();
+};
+
+const BASE = "http://localhost:8081";
+
+
+
+const handleAuthFailure = async (res) => {
+  if (res.status === 401 || res.status === 403) {
+    alert("Sesión inválida o token faltante/expirado. Vuelve a iniciar sesión.");
+    localStorage.removeItem("token");
+    localStorage.removeItem("username");
+    localStorage.removeItem("name");
+    window.location.replace("/login");
+    return true;
+  }
+  return false;
 };
 
 const Nav = styled.nav`
@@ -311,47 +327,40 @@ export default function Navbar({
     }
   };
 
-  const ensureUserId = async () => {
-    if (userId) return userId;
-    const uname = getCurrentUsername();
-    if (!uname) throw new Error("No hay usuario en sesión.");
-    const data = await searchUser(uname);
-    const u = data?.usuario;
-    if (!u?.id) throw new Error("No se pudo resolver el ID del usuario.");
-    setUserId(u.id);
-    return u.id;
-  };
+
 
   const handleDeleteUser = async () => {
+    const ok = window.confirm("¿Seguro que deseas eliminar tu cuenta? Esta acción es irreversible.");
+    if (!ok) return;
+
     try {
-      setLoading(true);
-      const id = await ensureUserId();
-      const uname = getCurrentUsername();
+      setLoading?.(true);
+      // 1) ID desde /api/auth/me con Authorization (robusto ante cambios de username)
+      const id = await getMyIdFromMe();
+      // 2) DELETE con Authorization, sin body ni headers extra
       const res = await fetch(makeUrl("/api/users/delete-user/" + id), {
         method: "DELETE",
         headers: authHeaders(),
       });
-      const tryJson = await res.json().catch(() => ({}));
+      // 3) Manejo de 401/403 centralizado
+      if (await handleAuthFailure(res)) return;
+      // 4) éxito o error específico del backend
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        if (res.status === 401 || res.status === 403) {
-          localStorage.removeItem("token");
-          localStorage.removeItem("username");
-          localStorage.removeItem("name");
-          window.location.replace("/login");
-          throw new Error("Sesión expirada");
-        }
-        throw new Error(tryJson?.error || "Error al eliminar usuario");
+        throw new Error(data?.error || "Error al eliminar usuario");
       }
-      setDeleteMessage(tryJson?.mensaje || "Usuario eliminado exitosamente");
-      setShowDeleteSuccessModal(true);
-       localStorage.setItem("__lastDeletedUsername", uname);
-       localStorage.removeItem("token");
-       localStorage.removeItem("username");
-       localStorage.removeItem("name");
+      alert(data?.mensaje || "Usuario eliminado exitosamente");
+      // 5) Limpiar sesión y redirigir al login (recarga)
+      localStorage.removeItem("token");
+      localStorage.removeItem("username");
+      localStorage.removeItem("name");
+      window.location.replace("/login");
     } catch (e) {
-      alert(e.message || "No se pudo eliminar el usuario.");
+      if (e.message !== "AUTH") {
+        alert(e.message || "Error al eliminar usuario");
+      }
     } finally {
-      setLoading(false);
+      setLoading?.(false);
     }
   };
 

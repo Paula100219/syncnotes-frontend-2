@@ -275,15 +275,29 @@ export function getRoomHistory(roomId) {
   return apiGet(`/api/rooms/${encodeURIComponent(roomId)}/history`);
 }
 
-// ✅ Obtener ID del usuario autenticado desde username almacenado
-export async function ensureUserId() {
-  const uname = getUsernameLS();
-  if (!uname) throw new Error("No hay usuario en sesión.");
+// ✅ Obtener ID del usuario autenticado desde /me
+export async function getMyIdFromMe() {
+  const token = getToken();
+  if (!token) throw new Error("No hay token de sesión.");
 
-  const data = await searchUser(uname);
-  const u = data?.usuario;
-  if (!u?.id) throw new Error("No se pudo resolver el ID del usuario.");
-  return u.id;
+  const res = await fetch(makeUrl("/api/auth/me"), { headers: authHeaders() });
+
+  if (await handleAuthFailure(res)) throw new Error("AUTH");
+
+  if (!res.ok) {
+    const err = await safeJson(res);
+    throw new Error(err?.error || "No se pudo obtener el usuario actual.");
+  }
+
+  const data = await safeJson(res);
+  const id = data?.user?.id || data?.id;
+  if (!id) throw new Error("No se pudo resolver el ID del usuario.");
+  return id;
+}
+
+// ✅ Obtener ID del usuario autenticado desde username almacenado (deprecated, usar getMyIdFromMe)
+export async function ensureUserId() {
+  return getMyIdFromMe();
 }
 
 // ✅ Actualizar usuario (PUT) SOLO { name, username }
