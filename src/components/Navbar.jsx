@@ -2,6 +2,7 @@ import styled from "styled-components";
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import logoPng from "../assets/logo.png";
+import { searchUser, updateUser, makeUrl, authHeaders } from "../services/Api";
 
 // Helpers MINIMOS y SEGUROS (colócalos arriba del componente, en el mismo archivo):
 
@@ -142,7 +143,7 @@ const AvatarInitials = styled.div`
 `;
 
 // 🔹 Estilos del menú desplegable
-const Dropdown = styled.div`
+const Dropdown = styled.ul`
   position: absolute;
   top: 56px;
   right: 0;
@@ -157,9 +158,10 @@ const Dropdown = styled.div`
   z-index: 999;
   animation: fadeIn 0.2s ease;
   overflow: hidden;
+  list-style: none;
 `;
 
-const DropItem = styled.button`
+const DropItem = styled.li`
   background: none;
   border: none;
   color: #e6eaf2;
@@ -224,11 +226,8 @@ export default function Navbar({
   const safeToggleUserMenu = typeof toggleUserMenu === "function" ? toggleUserMenu : () => setMenuOpen(!menuOpen);
 
   // 🔹 Estados para actualizar usuario
-  const API = (import.meta && import.meta.env && import.meta.env.VITE_API_BASE) || "";
   const [showUpdateModal, setShowUpdateModal] = useState(false);
-  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
-  const [showDeleteSuccessModal, setShowDeleteSuccessModal] = useState(false);
-  const [deleteMessage, setDeleteMessage] = useState("");
+   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState(null);
   const [form, setForm] = useState({ name: "", username: "" });
@@ -250,7 +249,7 @@ export default function Navbar({
     localStorage.removeItem("token");
     localStorage.removeItem("username");
     localStorage.removeItem("name");
-    navigate("/login");
+    window.location.replace("/login");
   };
 
   const getCurrentUsername = () => {
@@ -273,14 +272,7 @@ export default function Navbar({
     if (!uname) { alert("No hay usuario en sesión."); return false; }
     try {
       setLoading(true);
-      const res = await fetch(`${API}/api/users/searchUser/${encodeURIComponent(uname)}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token") || ""}` },
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "No se pudo cargar la información del usuario.");
-      }
-      const data = await res.json();
+      const data = await searchUser(uname);
       const u = data?.usuario;
       if (!u?.id) throw new Error("No se pudo resolver el ID del usuario.");
       setUserId(u.id);
@@ -308,31 +300,10 @@ export default function Navbar({
     };
     try {
       setLoading(true);
-      const res = await fetch(`${API}/api/users/update-user/${userId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-        },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Error al actualizar usuario");
-      }
-       alert("Usuario actualizado correctamente.");
-       setShowUpdateModal(false);
-        const current = getCurrentUsername();
-        if (body.username && current && body.username !== current) {
-          localStorage.setItem("username", body.username);
-        }
-        if (body.name) {
-          const currentName = localStorage.getItem("name");
-          if (body.name !== currentName) {
-            localStorage.setItem("name", body.name);
-          }
-        }
-        setInitials(getInitialsFromLS());
+      await updateUser(userId, body);
+      setShowUpdateModal(false);
+      navigate("/dashboard", { replace: true });
+      setInitials(getInitialsFromLS());
     } catch (e) {
       alert(e.message || "Error al actualizar usuario");
     } finally {
@@ -344,14 +315,7 @@ export default function Navbar({
     if (userId) return userId;
     const uname = getCurrentUsername();
     if (!uname) throw new Error("No hay usuario en sesión.");
-    const res = await fetch(`${API}/api/users/searchUser/${encodeURIComponent(uname)}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem("auth_token") || ""}` },
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err?.error || "No se pudo obtener el usuario actual.");
-    }
-    const data = await res.json();
+    const data = await searchUser(uname);
     const u = data?.usuario;
     if (!u?.id) throw new Error("No se pudo resolver el ID del usuario.");
     setUserId(u.id);
@@ -363,14 +327,19 @@ export default function Navbar({
       setLoading(true);
       const id = await ensureUserId();
       const uname = getCurrentUsername();
-      const res = await fetch(`${API}/api/users/delete-user/${id}`, {
+      const res = await fetch(makeUrl("/api/users/delete-user/" + id), {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token") || ""}`,
-        },
+        headers: authHeaders(),
       });
       const tryJson = await res.json().catch(() => ({}));
       if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("username");
+          localStorage.removeItem("name");
+          window.location.replace("/login");
+          throw new Error("Sesión expirada");
+        }
         throw new Error(tryJson?.error || "Error al eliminar usuario");
       }
       setDeleteMessage(tryJson?.mensaje || "Usuario eliminado exitosamente");
@@ -414,16 +383,16 @@ export default function Navbar({
               >
                  <AvatarInitials>{initials}</AvatarInitials>
               </AvatarTrigger>
-             {menuOpen && (
-               <Dropdown>
-                 <DropItem onClick={() => navigate("/perfil")}>Perfil</DropItem>
-                   <DropItem onClick={openUpdateUser}>
-                      Actualizar usuario
-                    </DropItem>
-                    <DropItem onClick={handleDeleteUser}>Eliminar usuario</DropItem>
-                   <DropItem onClick={handleLogout}>Cerrar sesión</DropItem>
-               </Dropdown>
-             )}
+              {menuOpen && (
+                <Dropdown>
+                  <DropItem className="dropdown-item" onClick={() => navigate("/perfil")}>Perfil</DropItem>
+                    <DropItem className="dropdown-item" onClick={openUpdateUser}>
+                       Actualizar usuario
+                     </DropItem>
+                     <DropItem className="dropdown-item" onClick={handleDeleteUser}>Eliminar usuario</DropItem>
+                    <DropItem className="dropdown-item" onClick={handleLogout}>Cerrar sesión</DropItem>
+                </Dropdown>
+              )}
            </div>
         </Right>
       </Nav>
@@ -502,29 +471,7 @@ export default function Navbar({
         </Modal>
       )}
 
-      {showDeleteSuccessModal && (
-        <Modal onClick={() => { setShowDeleteSuccessModal(false); navigate("/login"); }}>
-          <ModalContent onClick={(e) => e.stopPropagation()}>
-            <h3>Cuenta Eliminada</h3>
-            <p style={{ margin: '1rem 0', textAlign: 'center' }}>{deleteMessage}</p>
-            <div style={{ display: 'flex', justifyContent: 'center' }}>
-              <button
-                onClick={() => { setShowDeleteSuccessModal(false); navigate("/login"); }}
-                style={{
-                  backgroundColor: '#1677ff',
-                  color: 'white',
-                  border: 'none',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '0.5rem',
-                  cursor: 'pointer'
-                }}
-              >
-                Aceptar
-              </button>
-            </div>
-          </ModalContent>
-        </Modal>
-      )}
+
       </>
     );
   }

@@ -1,16 +1,17 @@
-// Base del backend desde .env (VITE_API_BASE=http://localhost:8081).
-// Si no está definida, usa cadena vacía (same-origin).
-const API =
-  (import.meta && import.meta.env && import.meta.env.VITE_API_BASE) || "";
+const API = "http://localhost:8081"; // AJUSTA si tu login usa otro
 
-function makeUrl(path) {
+export function makeUrl(path) {
   // path siempre debe comenzar con "/"
   return API + path;
 }
 
 // Guardar / obtener el token
-export const setToken = (t) => localStorage.setItem("auth_token", t);
-export const getToken = () => localStorage.getItem("auth_token");
+export const setToken = (t) => localStorage.setItem("token", t);
+export const getToken = () => localStorage.getItem("token");
+
+// Guardar / obtener el username
+export const setUsernameLS = (u) => localStorage.setItem("username", u);
+export const getUsernameLS = () => localStorage.getItem("username");
 
 // Helpers seguros
 async function safeJson(res) {
@@ -28,12 +29,24 @@ async function safeText(res) {
   }
 }
 
-function authHeaders(extra = {}) {
+export function authHeaders(extra = {}) {
   return {
     Authorization: "Bearer " + getToken(),
     ...extra,
   };
 }
+
+const handleAuthFailure = async (res) => {
+  if (res.status === 401 || res.status === 403) {
+    alert("Sesión inválida o token faltante/expirado. Vuelve a iniciar sesión.");
+    localStorage.removeItem("token");
+    localStorage.removeItem("username");
+    localStorage.removeItem("name");
+    window.location.replace("/login");
+    return true; // se manejó
+  }
+  return false;
+};
 
 // 🔹 LOGIN: obtiene el token y lo guarda (lanza error legible en 401/403)
 export async function login(username, password) {
@@ -54,9 +67,7 @@ export async function login(username, password) {
     throw err;
   }
 
-  const token = body && body.token;
-  setToken(token);
-  return token;
+  return body;
 }
 
 // 🔹 GET genérico con autorización (Bearer)
@@ -67,6 +78,7 @@ export async function apiGet(path) {
 
   const body = await safeJson(r);
   if (!r.ok) {
+    if (await handleAuthFailure(r)) return;
     const fallback = await safeText(r);
     const err = new Error(
       (body && (body.error || body.message)) || fallback || "Request failed"
@@ -87,6 +99,7 @@ async function apiPost(path, data) {
   });
   const body = await safeJson(r);
   if (!r.ok) {
+    if (await handleAuthFailure(r)) return;
     const fallback = await safeText(r);
     const err = new Error(
       (body && (body.error || body.message)) || fallback || "Request failed"
@@ -107,6 +120,7 @@ async function apiPut(path, data) {
   });
   const body = await safeJson(r);
   if (!r.ok) {
+    if (await handleAuthFailure(r)) return;
     const fallback = await safeText(r);
     const err = new Error(
       (body && (body.error || body.message)) || fallback || "Request failed"
@@ -125,6 +139,7 @@ async function apiDelete(path) {
     headers: authHeaders(),
   });
   if (!r.ok) {
+    if (await handleAuthFailure(r)) return;
     const body = await safeJson(r);
     const fallback = await safeText(r);
     const err = new Error(
@@ -221,6 +236,25 @@ export function searchUser(username) {
   return apiGet(`/api/users/searchUser/${encodeURIComponent(username)}`);
 }
 
+// ✅ Obtener usuario por username (para prellenar modal)
+export async function getUserByUsername(username) {
+  const r = await fetch(makeUrl(`/api/users/searchUser/${encodeURIComponent(username)}`), {
+    headers: authHeaders(),
+  });
+  const body = await safeJson(r);
+  if (!r.ok) {
+    if (await handleAuthFailure(r)) return;
+    const fallback = await safeText(r);
+    const err = new Error(
+      (body && (body.error || body.message)) || fallback || "Request failed"
+    );
+    err.status = r.status;
+    err.data = body;
+    throw err;
+  }
+  return body;
+}
+
 // ✅ Actualizar rol de miembro
 export function updateMemberRole(roomId, memberId, role) {
   return apiPut(`/api/rooms/${encodeURIComponent(roomId)}/members/${encodeURIComponent(memberId)}/role?role=${encodeURIComponent(role)}`);
@@ -239,6 +273,39 @@ export function getRoomMessages(roomId) {
 // ✅ Obtener historial de sala
 export function getRoomHistory(roomId) {
   return apiGet(`/api/rooms/${encodeURIComponent(roomId)}/history`);
+}
+
+// ✅ Obtener ID del usuario autenticado desde username almacenado
+export async function ensureUserId() {
+  const uname = getUsernameLS();
+  if (!uname) throw new Error("No hay usuario en sesión.");
+
+  const data = await searchUser(uname);
+  const u = data?.usuario;
+  if (!u?.id) throw new Error("No se pudo resolver el ID del usuario.");
+  return u.id;
+}
+
+// ✅ Actualizar usuario (PUT) SOLO { name, username }
+export async function updateUser(id, payload) {
+  const result = await apiPut(`/api/users/update-user/${encodeURIComponent(id)}`, payload);
+  // Sincronizar LS si cambió name/username
+  if (payload.username) localStorage.setItem("username", payload.username);
+  if (payload.name) localStorage.setItem("name", payload.name);
+  return result;
+}
+
+// ✅ Eliminar usuario (DELETE)
+export async function deleteUser(id) {
+  const success = await apiDelete(`/api/users/delete-user/${encodeURIComponent(id)}`);
+  if (success) {
+    // Logout y redirect solo en éxito
+    localStorage.removeItem("token");
+    localStorage.removeItem("username");
+    localStorage.removeItem("name");
+    window.location.replace("/login");
+  }
+  return success;
 }
 
 

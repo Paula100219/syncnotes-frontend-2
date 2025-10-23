@@ -503,11 +503,10 @@ export default function Dashboard() {
                   ← Volver a Mis Salas
                 </button>
               </aside>
-            </section>
-            )}
+             </section>
+             ) : (
 
-            
-              {/* Vista de grid */}
+               {/* Vista de grid */}
               <section className="dash-grid">
                {/* 🟦 Salas */}
                <div className="dash-left">

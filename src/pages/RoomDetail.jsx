@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
-import { getRoomDetails, getRoomTasks, addMember, updateMemberRole, searchUser, updateTask, deleteTask, getMe, createTask } from "../services/api";
+import { getRoomDetails, getRoomTasks, addMember, updateMemberRole, searchUser, updateTask, deleteTask, getMe, createTask, getToken } from "../services/api";
 import "./dashboard.css";
 
 const isValidMember = (m) => {
@@ -83,26 +83,37 @@ export default function RoomDetail() {
    const [showTaskModal, setShowTaskModal] = useState(false);
    const [taskSelected, setTaskSelected] = useState(null);
 
-  // Cargar datos
-   useEffect(() => {
-     (async () => {
-       try {
-         setLoading(true);
-         const [userData, roomData, tasksData] = await Promise.all([
-           getMe(),
-           getRoomDetails(roomId),
-           getRoomTasks(roomId),
-         ]);
-          setMe(userData);
-          setRoom({ ...roomData, members: sanitizeMembers(roomData.members) });
-          setTasks(tasksData);
-       } catch (e) {
-         setError(e?.message || "No se pudo cargar la sala.");
-       } finally {
-         setLoading(false);
-       }
-     })();
-   }, [roomId]);
+   // Cargar datos
+    useEffect(() => {
+      (async () => {
+        try {
+          setLoading(true);
+          let userData = null;
+          const t = getToken();
+          if (t) {
+            try {
+              userData = await getMe();
+              // sincroniza name/username opcionalmente
+              if (userData?.user?.name) localStorage.setItem("name", userData.user.name);
+              if (userData?.user?.username) localStorage.setItem("username", userData.user.username);
+            } catch (e) {
+              console.error("Fallo /me:", e);
+            }
+          }
+          const [roomData, tasksData] = await Promise.all([
+            getRoomDetails(roomId),
+            getRoomTasks(roomId),
+          ]);
+           setMe(userData);
+           setRoom({ ...roomData, members: sanitizeMembers(roomData.members) });
+           setTasks(tasksData);
+        } catch (e) {
+          setError(e?.message || "No se pudo cargar la sala.");
+        } finally {
+          setLoading(false);
+        }
+      })();
+    }, [roomId]);
 
    // Cerrar modal con Esc
    useEffect(() => {

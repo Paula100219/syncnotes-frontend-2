@@ -1,7 +1,7 @@
 // src/components/ProtectedRoute.jsx
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { getMe, getToken, setToken } from "../services/api";
+import { getMe, getToken, setToken } from "../services/Api";
 
 export default function ProtectedRoute({ children }) {
   const [state, setState] = useState({ loading: true, ok: false });
@@ -17,12 +17,12 @@ export default function ProtectedRoute({ children }) {
       try {
         await getMe(); // valida token rápido
         if (mounted) setState({ loading: false, ok: true });
-      } catch {
-        // token inválido/expirado
-        setToken(""); // limpia
-        localStorage.removeItem("auth_token");
-        if (mounted) setState({ loading: false, ok: false });
-      }
+       } catch {
+         // token inválido/expirado
+         setToken(""); // limpia
+         localStorage.removeItem("token");
+         if (mounted) setState({ loading: false, ok: false });
+       }
     }
     check();
     return () => { mounted = false; };

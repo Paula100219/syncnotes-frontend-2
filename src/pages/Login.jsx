@@ -52,10 +52,10 @@ export default function Login() {
 
     setLoading(true);
     try {
-      const body = await login(form.username, form.password);
-      localStorage.setItem("token", body.token);
-      localStorage.setItem("username", body.user?.username || form.username);
-      localStorage.setItem("name", body.user?.name || "");
+      const data = await login(form.username, form.password);
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("username", data.user?.username || form.username);
+      localStorage.setItem("name", data.user?.name || "");
       navigate("/dashboard"); // ⬅️ al dashboard
     } catch (err) {
       const status =
