@@ -2,9 +2,55 @@ import styled from "styled-components";
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect, useRef } from "react";
 import logoPng from "../assets/logo.png";
-import { searchUser, updateUser, makeUrl, authHeaders, getMyIdFromMe } from "../services/Api";
+import { searchUser } from "../services/Api";
 
 // Helpers MINIMOS y SEGUROS (colócalos arriba del componente, en el mismo archivo):
+
+const BASE = "http://localhost:8081"; // usa la MISMA base del login
+
+const getToken = () => localStorage.getItem("token") || "";
+
+const authHeader = () => ({ Authorization: `Bearer ${getToken()}` });
+
+const forceLogout = () => {
+  alert("Sesión inválida o token faltante/expirado. Vuelve a iniciar sesión.");
+  localStorage.removeItem("token");
+  localStorage.removeItem("username");
+  localStorage.removeItem("name");
+  window.location.replace("/login");
+};
+
+const maybeForceLogout = async (res, url) => {
+  if (res.status === 401) {
+    forceLogout();
+    return true;
+  }
+  if (res.status === 403 && url.includes("/api/auth/me")) {
+    forceLogout();
+    return true;
+  }
+  return false;
+};
+
+const getMyIdFromMe = async () => {
+  const token = getToken();
+  if (!token) throw new Error("No hay token de sesión.");
+
+  const url = `${BASE}/api/auth/me`;
+  const res = await fetch(url, { headers: authHeader() });
+
+  if (await maybeForceLogout(res, url)) throw new Error("AUTH");
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error || "No se pudo obtener el usuario actual.");
+  }
+
+  const data = await res.json();
+  const id = data?.user?.id || data?.id;
+  if (!id) throw new Error("No se pudo resolver el ID del usuario.");
+  return id;
+};
 
 const getInitialsFromLS = () => {
   const val =
@@ -16,23 +62,6 @@ const getInitialsFromLS = () => {
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
   return val.slice(0, 2).toUpperCase();
 };
-
-const BASE = "http://localhost:8081";
-
-
-
-const handleAuthFailure = async (res) => {
-  if (res.status === 401 || res.status === 403) {
-    alert("Sesión inválida o token faltante/expirado. Vuelve a iniciar sesión.");
-    localStorage.removeItem("token");
-    localStorage.removeItem("username");
-    localStorage.removeItem("name");
-    window.location.replace("/login");
-    return true;
-  }
-  return false;
-};
-
 const Nav = styled.nav`
   display: flex;
   justify-content: space-between;
@@ -316,12 +345,21 @@ export default function Navbar({
     };
     try {
       setLoading(true);
-      await updateUser(userId, body);
+      const urlUpdate = `${BASE}/api/users/update-user/${userId}`;
+      const resUp = await fetch(urlUpdate, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify(body),
+      });
+      if (await maybeForceLogout(resUp, urlUpdate)) return;
+      if (!resUp.ok) {
+        const err = await resUp.json().catch(() => ({}));
+        alert(err.error || "Error al actualizar usuario");
+        return;
+      }
       setShowUpdateModal(false);
       navigate("/dashboard", { replace: true });
       setInitials(getInitialsFromLS());
-    } catch (e) {
-      alert(e.message || "Error al actualizar usuario");
     } finally {
       setLoading(false);
     }
@@ -330,20 +368,18 @@ export default function Navbar({
 
 
   const handleDeleteUser = async () => {
-    const ok = window.confirm("¿Seguro que deseas eliminar tu cuenta? Esta acción es irreversible.");
-    if (!ok) return;
-
     try {
       setLoading?.(true);
       // 1) ID desde /api/auth/me con Authorization (robusto ante cambios de username)
       const id = await getMyIdFromMe();
       // 2) DELETE con Authorization, sin body ni headers extra
-      const res = await fetch(makeUrl("/api/users/delete-user/" + id), {
+      const url = `${BASE}/api/users/delete-user/${id}`;
+      const res = await fetch(url, {
         method: "DELETE",
-        headers: authHeaders(),
+        headers: authHeader(),
       });
       // 3) Manejo de 401/403 centralizado
-      if (await handleAuthFailure(res)) return;
+      if (await maybeForceLogout(res, url)) return;
       // 4) éxito o error específico del backend
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {

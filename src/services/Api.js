@@ -36,8 +36,16 @@ export function authHeaders(extra = {}) {
   };
 }
 
-const handleAuthFailure = async (res) => {
-  if (res.status === 401 || res.status === 403) {
+const handleAuthFailure = async (res, path) => {
+  if (res.status === 401) {
+    alert("Sesión inválida o token faltante/expirado. Vuelve a iniciar sesión.");
+    localStorage.removeItem("token");
+    localStorage.removeItem("username");
+    localStorage.removeItem("name");
+    window.location.replace("/login");
+    return true; // se manejó
+  }
+  if (res.status === 403 && path === "/api/auth/me") {
     alert("Sesión inválida o token faltante/expirado. Vuelve a iniciar sesión.");
     localStorage.removeItem("token");
     localStorage.removeItem("username");
@@ -78,7 +86,7 @@ export async function apiGet(path) {
 
   const body = await safeJson(r);
   if (!r.ok) {
-    if (await handleAuthFailure(r)) return;
+    if (await handleAuthFailure(r, path)) return;
     const fallback = await safeText(r);
     const err = new Error(
       (body && (body.error || body.message)) || fallback || "Request failed"
@@ -99,7 +107,7 @@ async function apiPost(path, data) {
   });
   const body = await safeJson(r);
   if (!r.ok) {
-    if (await handleAuthFailure(r)) return;
+    if (await handleAuthFailure(r, path)) return;
     const fallback = await safeText(r);
     const err = new Error(
       (body && (body.error || body.message)) || fallback || "Request failed"
@@ -275,30 +283,7 @@ export function getRoomHistory(roomId) {
   return apiGet(`/api/rooms/${encodeURIComponent(roomId)}/history`);
 }
 
-// ✅ Obtener ID del usuario autenticado desde /me
-export async function getMyIdFromMe() {
-  const token = getToken();
-  if (!token) throw new Error("No hay token de sesión.");
 
-  const res = await fetch(makeUrl("/api/auth/me"), { headers: authHeaders() });
-
-  if (await handleAuthFailure(res)) throw new Error("AUTH");
-
-  if (!res.ok) {
-    const err = await safeJson(res);
-    throw new Error(err?.error || "No se pudo obtener el usuario actual.");
-  }
-
-  const data = await safeJson(res);
-  const id = data?.user?.id || data?.id;
-  if (!id) throw new Error("No se pudo resolver el ID del usuario.");
-  return id;
-}
-
-// ✅ Obtener ID del usuario autenticado desde username almacenado (deprecated, usar getMyIdFromMe)
-export async function ensureUserId() {
-  return getMyIdFromMe();
-}
 
 // ✅ Actualizar usuario (PUT) SOLO { name, username }
 export async function updateUser(id, payload) {
