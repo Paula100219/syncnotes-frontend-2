@@ -128,7 +128,7 @@ async function apiPut(path, data) {
   });
   const body = await safeJson(r);
   if (!r.ok) {
-    if (await handleAuthFailure(r)) return;
+    if (await handleAuthFailure(r, path)) return;
     const fallback = await safeText(r);
     const err = new Error(
       (body && (body.error || body.message)) || fallback || "Request failed"
@@ -147,7 +147,7 @@ async function apiDelete(path) {
     headers: authHeaders(),
   });
   if (!r.ok) {
-    if (await handleAuthFailure(r)) return;
+    if (await handleAuthFailure(r, path)) return;
     const body = await safeJson(r);
     const fallback = await safeText(r);
     const err = new Error(
@@ -307,6 +307,14 @@ export async function deleteUser(id) {
   return success;
 }
 
+
+// 🔹 Logout: limpiar sesión y redirigir
+export const logout = () => {
+  localStorage.removeItem("token");
+  localStorage.removeItem("username");
+  localStorage.removeItem("name");
+  window.location.replace("/login");
+};
 
 // 🔹 (opcional) test conexión
 export async function getServerMessage() {

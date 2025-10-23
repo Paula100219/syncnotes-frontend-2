@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Navbar from "../components/Navbar";
+import ChatBox from "../components/ChatBox";
 import {
   getMe,
   getMyRooms,
@@ -74,9 +75,12 @@ export default function Dashboard() {
        const [usuarioEncontrado, setUsuarioEncontrado] = useState(null);
        const [message, setMessage] = useState("");
        const [searching, setSearching] = useState(false);
-       const [adding, setAdding] = useState(false);
+        const [adding, setAdding] = useState(false);
 
-  // 🔹 Cargar usuario
+        const [selectedRoomId, setSelectedRoomId] = useState(null);
+        const [showChat, setShowChat] = useState(true);
+
+   // 🔹 Cargar usuario
   useEffect(() => {
     (async () => {
       try {
@@ -96,22 +100,23 @@ export default function Dashboard() {
   const rooms = me?.rooms || [];
 
   // 🔹 Cargar tareas de una sala
-  const handleOpenRoom = async (room) => {
-    setSelectedRoom(room);
-    try {
-      setLoading(true);
-      const [roomTasks, roomDetails] = await Promise.all([
-        getRoomTasks(room.id),
-        getRoomDetails(room.id),
-      ]);
-      setTasks(roomTasks);
-      setSelectedRoom({ ...roomDetails, members: sanitizeMembers(roomDetails.members) }); // actualizar con detalles completos
-    } catch {
-      alert("No se pudieron cargar los datos de la sala");
-    } finally {
-      setLoading(false);
-    }
-  };
+   const handleOpenRoom = async (room) => {
+     setSelectedRoom(room);
+     setSelectedRoomId(room.id);
+     try {
+       setLoading(true);
+       const [roomTasks, roomDetails] = await Promise.all([
+         getRoomTasks(room.id),
+         getRoomDetails(room.id),
+       ]);
+       setTasks(roomTasks);
+       setSelectedRoom({ ...roomDetails, members: sanitizeMembers(roomDetails.members) }); // actualizar con detalles completos
+     } catch {
+       alert("No se pudieron cargar los datos de la sala");
+     } finally {
+       setLoading(false);
+     }
+   };
 
   // 🔹 Crear sala
   const handleRoomChange = (e) => {
@@ -322,6 +327,7 @@ export default function Dashboard() {
         variant="dashboard"
         onCreateRoom={() => setOpenRoomModal(true)}
         onViewPublicRooms={() => alert("Próximamente")}
+        onGoToChat={() => setShowChat(true)}
       />
 
       <main className="dash-main">
@@ -333,11 +339,10 @@ export default function Dashboard() {
           <div className="dash-loading">Cargando…</div>
         ) : error ? (
           <div className="ns-alert ns-alert--err">{error}</div>
-          ) : 
-          selectedRoom ? (
-
-              <section className="dash-room-view">
-               <aside className="dash-right">
+         ) : (
+           selectedRoom ? (
+             <section className="dash-room-view">
+                <aside className="dash-right">
                 <h2 className="dash-section-title">
                   {selectedRoom
                     ? `Sala: ${selectedRoom.name}`
@@ -494,14 +499,25 @@ export default function Dashboard() {
                          + Nueva tarea
                        </button>
                   )}
-                </div>
-                <button
-                  className="btn-panel"
-                  onClick={() => setSelectedRoom(null)}
-                  style={{ marginTop: '20px', width: 'auto', padding: '10px 16px' }}
-                >
-                  ← Volver a Mis Salas
-                </button>
+                  </div>
+                  <button
+                    className="btn-panel"
+                    onClick={() => setShowChat(!showChat)}
+                    style={{ marginTop: '10px', width: 'auto', padding: '10px 16px' }}
+                  >
+                    {showChat ? 'Ocultar Chat' : 'Mostrar Chat'}
+                  </button>
+                  {showChat && <ChatBox roomId={selectedRoom?.id} />}
+                  <button
+                    className="btn-panel"
+                    onClick={() => {
+                      setSelectedRoom(null);
+                      setSelectedRoomId(null);
+                    }}
+                    style={{ marginTop: '20px', width: 'auto', padding: '10px 16px' }}
+                  >
+                    ← Volver a Mis Salas
+                  </button>
               </aside>
              </section>
              ) : (
@@ -522,45 +538,44 @@ export default function Dashboard() {
                      </div>
           )}
 
-            {!selectedRoom && (
-                      {rooms.length > 0 && rooms.map((r) => (
-                       <div key={r.id} className="room-card">
-                         <div className="room-title">{r.name}</div>
-                         <div className="room-sub">
-                           {r.members?.length ?? 0} miembros
-                         </div>
-                         <div className="room-actions">
-                           <button
-                             className="btn-secondary"
-                             onClick={() => handleOpenRoom(r)}
-                           >
-                             Abrir sala
-                           </button>
-                           <button
-                             className="btn-ghost"
-                             onClick={() => confirmDeleteRoom(r)}
-                           >
-                             🗑️ Eliminar
-                           </button>
-                         </div>
-                       </div>
+                     {rooms.length > 0 && rooms.map((r) => (
+                        <div key={r.id} className="room-card">
+                          <div className="room-title">{r.name}</div>
+                          <div className="room-sub">
+                            {r.members?.length ?? 0} miembros
+                          </div>
+                          <div className="room-actions">
+                            <button
+                              className="btn-secondary"
+                              onClick={() => handleOpenRoom(r)}
+                            >
+                              Abrir sala
+                            </button>
+                            <button
+                              className="btn-ghost"
+                              onClick={() => confirmDeleteRoom(r)}
+                            >
+                              🗑️ Eliminar
+                            </button>
+                          </div>
+                        </div>
                       )
                     )}
-                 </div>
                </div>
 
-               {/* 🟩 Panel vacío en grid */}
-               <aside className="dash-right">
-                 <h2 className="dash-section-title">
-                   Selecciona una sala
-                 </h2>
-                 <div className="tasks-empty">
-                   Haz clic en "Abrir sala" para ver detalles
-                 </div>
-               </aside>
-             </section>
-           )}
-         )}
+                {/* 🟩 Panel vacío en grid */}
+                <aside className="dash-right">
+                  <h2 className="dash-section-title">
+                    Selecciona una sala
+                  </h2>
+                  <div className="tasks-empty">
+                    Haz clic en "Abrir sala" para ver detalles
+                  </div>
+                  <ChatBox />
+                </aside>
+              </section>
+            ) )
+          )}
        </main>
 
 
@@ -755,10 +770,10 @@ export default function Dashboard() {
                          if (/^[a-fA-F0-9]{24}$/.test(val)) {
                            setUserIdSeleccionado(val);
                            setMessage("ID válido");
-                         } else {
-                           setMessage("ID inválido");
-          )
-                       }
+                          } else {
+                            setMessage("ID inválido");
+                          }
+                        }
                      }}
                      placeholder={searchMode === "username" ? "Ingresa username" : "Ingresa userId (24 hex)"}
                    />

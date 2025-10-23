@@ -261,6 +261,7 @@ export default function Navbar({
   variant = "login",
   onCreateRoom,
   onViewPublicRooms,
+  onGoToChat,
   toggleUserMenu,
 }) {
   const navigate = useNavigate();
@@ -414,7 +415,7 @@ export default function Navbar({
             + Crear nueva sala
           </Button>
 
-          <Button onClick={() => navigate("/chat")}>💬 Ir al chat</Button>
+           <Button onClick={onGoToChat}>💬 Ir al chat</Button>
 
           <Button onClick={onViewPublicRooms}>Ver salas públicas</Button>
           <IconButton title="Notificaciones">🔔</IconButton>
