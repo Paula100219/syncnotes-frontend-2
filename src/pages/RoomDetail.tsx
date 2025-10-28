@@ -1,10 +1,50 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
-import { getRoomDetails, getRoomTasks, addMember, updateMemberRole, searchUser, updateTask, deleteTask, getMe, createTask, getToken } from "../services/api";
+import RoomChatPanel from "../components/RoomChatPanel";
+import { useAuth } from "../hooks/useAuth";
+import { getRoomDetails, getRoomTasks, addMember, searchUser, updateTask, deleteTask, createTask } from "../services/api";
 import "./dashboard.css";
 
-const isValidMember = (m) => {
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
+
+interface Member {
+  id?: string;
+  username?: string;
+  name?: string;
+  role?: string;
+  isOwner?: boolean;
+  roles?: string[];
+}
+
+interface Room {
+  name: string;
+  description?: string;
+  isPublic: boolean;
+  members: (Member | string)[];
+  owner?: Member;
+  createdBy?: Member;
+  ownerUsername?: string;
+  createdByUsername?: string;
+}
+
+interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  completed: boolean;
+  priority: string;
+  createdByName?: string;
+  createdByUsername?: string;
+  createdAt?: string;
+}
+
+interface User {
+  id: string;
+  username: string;
+}
+
+const isValidMember = (m: Member | string): boolean => {
   // Acepta objetos con al menos id/username/name.
   if (!m) return false;
   if (typeof m === "string") {
@@ -52,75 +92,61 @@ const findOwnerUsernameFromMembers = (members = []) => {
   return null;
 };
 
-export default function RoomDetail() {
-  const { roomId } = useParams();
+export default function RoomDetail(): JSX.Element {
+  const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(true);
-  const [room, setRoom] = useState(null);
-  const [tasks, setTasks] = useState([]);
-  const [me, setMe] = useState(null);
-  const [error, setError] = useState(null);
+  const { token, user } = useAuth() as { token: string | null; user: User | null };
+  const [loading, setLoading] = useState<boolean>(true);
+  const [room, setRoom] = useState<Room | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-  // Estados del modal añadir miembro
-  const [openAddMemberModal, setOpenAddMemberModal] = useState(false);
-  const [searchMode, setSearchMode] = useState("username");
-  const [usernameInput, setUsernameInput] = useState("");
-  const [userIdSeleccionado, setUserIdSeleccionado] = useState("");
+   // Estados del modal añadir miembro
+    const [openAddMemberModal, setOpenAddMemberModal] = useState<boolean>(false);
+    const [usernameInput, setUsernameInput] = useState<string>("");
+    const [userIdSeleccionado, setUserIdSeleccionado] = useState<string>("");
 
-  const [message, setMessage] = useState("");
-  const [searching, setSearching] = useState(false);
+  const [message, setMessage] = useState<string>("");
+  const [searching, setSearching] = useState<boolean>(false);
 
-  const [openDeleteTaskModal, setOpenDeleteTaskModal] = useState(false);
-  const [taskToDelete, setTaskToDelete] = useState(null);
-  const [openTaskModal, setOpenTaskModal] = useState(false);
-  const [taskForm, setTaskForm] = useState({
+  const [openDeleteTaskModal, setOpenDeleteTaskModal] = useState<boolean>(false);
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+  const [openTaskModal, setOpenTaskModal] = useState<boolean>(false);
+  const [taskForm, setTaskForm] = useState<{ title: string; description: string }>({
     title: "",
     description: "",
   });
-  const [taskError, setTaskError] = useState("");
-  const [taskLoading, setTaskLoading] = useState(false);
-   const [selectedTask, setSelectedTask] = useState(null);
-   const [showTaskModal, setShowTaskModal] = useState(false);
-   const [taskSelected, setTaskSelected] = useState(null);
+  const [taskError, setTaskError] = useState<string>("");
+  const [taskLoading, setTaskLoading] = useState<boolean>(false);
+     const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+     const [showTaskModal, setShowTaskModal] = useState<boolean>(false);
+     const [taskSelected, setTaskSelected] = useState<Task | null>(null);
 
-   // Cargar datos
+    // Cargar datos
+     useEffect(() => {
+        (async () => {
+          try {
+            setLoading(true);
+            const [roomData, tasksData] = await Promise.all([
+              getRoomDetails(roomId!),
+              getRoomTasks(roomId!),
+            ]);
+            setRoom({ ...roomData, members: sanitizeMembers(roomData.members) });
+            setTasks(tasksData);
+         } catch (e) {
+           setError(e?.message || "No se pudo cargar la sala.");
+         } finally {
+           setLoading(false);
+         }
+       })();
+     }, [roomId]);
+
+    // Cerrar modal con Esc
     useEffect(() => {
-      (async () => {
-        try {
-          setLoading(true);
-          let userData = null;
-          const t = getToken();
-          if (t) {
-            try {
-              userData = await getMe();
-              // sincroniza name/username opcionalmente
-              if (userData?.user?.name) localStorage.setItem("name", userData.user.name);
-              if (userData?.user?.username) localStorage.setItem("username", userData.user.username);
-            } catch (e) {
-              console.error("Fallo /me:", e);
-            }
-          }
-          const [roomData, tasksData] = await Promise.all([
-            getRoomDetails(roomId),
-            getRoomTasks(roomId),
-          ]);
-           setMe(userData);
-           setRoom({ ...roomData, members: sanitizeMembers(roomData.members) });
-           setTasks(tasksData);
-        } catch (e) {
-          setError(e?.message || "No se pudo cargar la sala.");
-        } finally {
-          setLoading(false);
-        }
-      })();
-    }, [roomId]);
-
-   // Cerrar modal con Esc
-   useEffect(() => {
-     const onKey = (e) => e.key === 'Escape' && setShowTaskModal(false);
-     window.addEventListener('keydown', onKey);
-     return () => window.removeEventListener('keydown', onKey);
-   }, []);
+      const onKey = (e) => e.key === 'Escape' && setShowTaskModal(false);
+      window.addEventListener('keydown', onKey);
+      return () => window.removeEventListener('keydown', onKey);
+    }, []);
 
   // Reset modal
   const resetForm = () => {
@@ -190,13 +216,13 @@ export default function RoomDetail() {
       return;
     }
 
-    try {
-      await addMember(roomId, userIdSeleccionado, "EDITOR");
-       setMessage("Miembro añadido correctamente");
-       setOpenAddMemberModal(false);
-       resetForm();
-       // Refrescar
-       const roomData = await getRoomDetails(roomId);
+     try {
+       await addMember(roomId!, userIdSeleccionado, "EDITOR");
+        setMessage("Miembro añadido correctamente");
+        setOpenAddMemberModal(false);
+        resetForm();
+        // Refrescar
+        const roomData = await getRoomDetails(roomId!);
        setRoom({ ...roomData, members: sanitizeMembers(roomData.members) });
      } catch (err) {
        if (err.status === 401 || err.status === 403) {
@@ -214,54 +240,46 @@ export default function RoomDetail() {
      }
   };
 
-  // Cambiar rol
-  const handleChangeRole = async (memberId, newRole) => {
-    try {
-      await updateMemberRole(roomId, memberId, newRole);
-      const roomData = await getRoomDetails(roomId);
-      setRoom({ ...roomData, members: sanitizeMembers(roomData.members) });
-    } catch (err) {
-      alert(err.message || "No se pudo cambiar el rol");
-    }
-  };
 
-  // Toggle completar tarea
-  const handleToggleComplete = async (task) => {
-    const originalCompleted = task.completed;
-    setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, completed: !t.completed } : t)));
-    try {
-      await updateTask(roomId, task.id, { completed: !task.completed });
-    } catch (err) {
-      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, completed: originalCompleted } : t)));
-      alert(err.message || "No se pudo actualizar la tarea");
-    }
-  };
 
-  // Confirmar eliminar tarea
-  const confirmDeleteTask = (task) => {
-    setTaskToDelete(task);
-    setOpenDeleteTaskModal(true);
-  };
+   // Toggle completar tarea
+   const handleToggleComplete = async (task: Task) => {
+     const originalCompleted = task.completed;
+     setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, completed: !t.completed } : t)));
+     try {
+       await updateTask(roomId!, task.id, { completed: !task.completed });
+     } catch (err) {
+       setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, completed: originalCompleted } : t)));
+       alert(err.message || "No se pudo actualizar la tarea");
+     }
+   };
 
-  // Eliminar tarea
-  const handleDeleteTask = async () => {
-    try {
-      await deleteTask(roomId, taskToDelete.id);
-      setTasks((prev) => prev.filter((t) => t.id !== taskToDelete.id));
-      setOpenDeleteTaskModal(false);
-      setTaskToDelete(null);
-    } catch (err) {
-      alert(err.message || "No se pudo eliminar la tarea");
-    }
-  };
+   // Confirmar eliminar tarea
+   const confirmDeleteTask = (task: Task) => {
+     setTaskToDelete(task);
+     setOpenDeleteTaskModal(true);
+   };
 
-  // Crear tarea
-  const handleTaskChange = (e) => {
-    const { name, value } = e.target;
-    setTaskForm((f) => ({ ...f, [name]: value }));
-  };
+   // Eliminar tarea
+   const handleDeleteTask = async () => {
+     if (!taskToDelete) return;
+     try {
+       await deleteTask(roomId!, taskToDelete.id);
+       setTasks((prev) => prev.filter((t) => t.id !== taskToDelete.id));
+       setOpenDeleteTaskModal(false);
+       setTaskToDelete(null);
+     } catch (err) {
+       alert(err.message || "No se pudo eliminar la tarea");
+     }
+   };
 
-  const submitTask = async (e) => {
+   // Crear tarea
+   const handleTaskChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+     const { name, value } = e.target;
+     setTaskForm((f) => ({ ...f, [name]: value }));
+   };
+
+   const submitTask = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!taskForm.title.trim()) {
       setTaskError("El título es obligatorio");
@@ -274,7 +292,7 @@ export default function RoomDetail() {
         title: taskForm.title,
         description: taskForm.description || "",
       };
-      const newTask = await createTask(roomId, payload);
+       const newTask = await createTask(roomId!, payload);
       setTasks((prev) => [newTask, ...prev]);
       setOpenTaskModal(false);
       setTaskForm({ title: "", description: "" });
@@ -288,16 +306,16 @@ export default function RoomDetail() {
        } else {
         alert(err.message || "No se pudo crear la tarea");
       }
-    } finally {
-      setTaskLoading(false);
-    }
-  };
+     } finally {
+       setTaskLoading(false);
+     }
+    };
 
-  if (loading) return <div className="ns-root"><div className="dash-loading">Cargando…</div></div>;
+   if (loading) return <div className="ns-root"><div className="dash-loading">Cargando…</div></div>;
   if (error) return <div className="ns-root"><div className="ns-alert ns-alert--err">{error}</div></div>;
   if (!room) return <div className="ns-root"><div>No se encontró la sala.</div></div>;
 
-  const myRole = room?.members?.find(m => m.userId === me?.id)?.role;
+  const myRole = room?.members?.find(m => m.userId === user?.id)?.role;
   const safeMembers = sanitizeMembers(room?.members || []);
 
   let ownerUsername = getOwnerUsername(room);
@@ -305,13 +323,7 @@ export default function RoomDetail() {
     ownerUsername = findOwnerUsernameFromMembers(safeMembers);
   }
 
-  let ownerLabel = null;
-  if (ownerUsername) {
-    const ownerObj = safeMembers.find(
-      (m) => typeof m !== "string" && m?.username === ownerUsername
-    );
-    ownerLabel = ownerObj?.name || ownerObj?.username || ownerUsername;
-  }
+
 
   return (
     <div className="ns-root">
@@ -382,70 +394,76 @@ export default function RoomDetail() {
                 </ul>
               </div>
 
-          {/* Tareas */}
-          <div className="tasks-panel">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h3>Tareas</h3>
-              {myRole !== 'VIEWER' && (
-                <button className="btn-primary" onClick={handleOpenTaskModal}>
-                  + Nueva tarea
-                </button>
-              )}
-            </div>
-            {tasks.length === 0 ? (
-              <div className="tasks-empty">No hay tareas en esta sala</div>
-            ) : (
-               <ul className="tasks-list">
-                 {tasks.map((t) => (
-                   <li
-                     key={t.id}
-                     className="task-item"
-                     onClick={() => { setTaskSelected(t); setShowTaskModal(true); }}
-                   >
-                     {/* Lado izquierdo: punto + título */}
-                     <div className="task-main">
-                       <span className="dot" style={{ background: t.priority === "HIGH" ? "#ef4444" : t.priority === "LOW" ? "#22c55e" : "#f59e0b" }} />
-                       <span className="task-title" style={t.completed ? { textDecoration: "line-through", opacity: 0.6 } : {}}>{t.title}</span>
-                       <span className={`badge ${t.priority === "HIGH" ? "badge-danger" : t.priority === "LOW" ? "badge-success" : "badge-warning"}`}>
-                         {t.priority}
-                       </span>
-                     </div>
-                     {/* Lado derecho: acciones (no deben propagar el click) */}
-                     {myRole !== 'VIEWER' && (
-                       <div className="task-actions" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            className="icon-btn"
-                            title={t.completed ? "Marcar como pendiente" : "Marcar como completada"}
-                            onClick={() => handleToggleComplete(t)}
-                            style={{ color: t.completed ? '#6b7280' : '#22c55e' }}
-                          >
-                            {t.completed ? (
-                              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.59 5.58L20 12l-8-8-8 8z" fill="currentColor"/>
-                              </svg>
-                            ) : (
-                              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="currentColor"/>
-                              </svg>
-                            )}
-                          </button>
-                          <button
-                            className="icon-btn"
-                            title="Eliminar tarea"
-                             onClick={() => confirmDeleteTask(t)}
-                             style={{ color: '#ef4444' }}
-                          >
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                              <path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7z" fill="currentColor"/>
-                            </svg>
-                          </button>
-                       </div>
-                     )}
-                   </li>
-                 ))}
-              </ul>
-            )}
-          </div>
+           {/* Tareas */}
+           <div className="tasks-panel">
+             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+               <h3>Tareas</h3>
+               {myRole !== 'VIEWER' && (
+                 <button className="btn-primary" onClick={handleOpenTaskModal}>
+                   + Nueva tarea
+                 </button>
+               )}
+             </div>
+             {tasks.length === 0 ? (
+               <div className="tasks-empty">No hay tareas en esta sala</div>
+             ) : (
+                <ul className="tasks-list">
+                  {tasks.map((t) => (
+                    <li
+                      key={t.id}
+                      className="task-item"
+                      onClick={() => { setTaskSelected(t); setShowTaskModal(true); }}
+                    >
+                      {/* Lado izquierdo: punto + título */}
+                      <div className="task-main">
+                        <span className="dot" style={{ background: t.priority === "HIGH" ? "#ef4444" : t.priority === "LOW" ? "#22c55e" : "#f59e0b" }} />
+                        <span className="task-title" style={t.completed ? { textDecoration: "line-through", opacity: 0.6 } : {}}>{t.title}</span>
+                        <span className={`badge ${t.priority === "HIGH" ? "badge-danger" : t.priority === "LOW" ? "badge-success" : "badge-warning"}`}>
+                          {t.priority}
+                        </span>
+                      </div>
+                      {/* Lado derecho: acciones (no deben propagar el click) */}
+                      {myRole !== 'VIEWER' && (
+                        <div className="task-actions" onClick={(e) => e.stopPropagation()}>
+                           <button
+                             className="icon-btn"
+                             title={t.completed ? "Marcar como pendiente" : "Marcar como completada"}
+                             onClick={() => handleToggleComplete(t)}
+                             style={{ color: t.completed ? '#6b7280' : '#22c55e' }}
+                           >
+                             {t.completed ? (
+                               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                 <path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.59 5.58L20 12l-8-8-8 8z" fill="currentColor"/>
+                               </svg>
+                             ) : (
+                               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                 <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z" fill="currentColor"/>
+                               </svg>
+                             )}
+                           </button>
+                           <button
+                             className="icon-btn"
+                             title="Eliminar tarea"
+                              onClick={() => confirmDeleteTask(t)}
+                              style={{ color: '#ef4444' }}
+                           >
+                             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                               <path d="M16 9v10H8V9h8m-1.5-6h-5l-1 1H5v2h14V4h-3.5l-1-1zM18 7H6v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7z" fill="currentColor"/>
+                             </svg>
+                           </button>
+                        </div>
+                      )}
+                    </li>
+                  ))}
+               </ul>
+             )}
+           </div>
+
+               {/* Chat de la sala */}
+               <RoomChatPanel
+                 roomId={roomId}
+                 currentUsername={user?.username}
+               />
         </section>
       </main>
 

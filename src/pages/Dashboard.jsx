@@ -519,11 +519,9 @@ export default function Dashboard() {
                     ← Volver a Mis Salas
                   </button>
               </aside>
-             </section>
-             ) : (
-
-               {/* Vista de grid */}
-              <section className="dash-grid">
+              </section>
+              ) : 
+               <section className="dash-grid">
                {/* 🟦 Salas */}
                <div className="dash-left">
                  <h2 className="dash-section-title">Mis Salas</h2>
@@ -572,10 +570,9 @@ export default function Dashboard() {
                     Haz clic en "Abrir sala" para ver detalles
                   </div>
                   <ChatBox />
-                </aside>
-              </section>
-            ) )
-          )}
+                 </aside>
+                </section>
+            }
        </main>
 
 

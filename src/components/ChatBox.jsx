@@ -11,20 +11,22 @@ export default function ChatBox({ roomId }) {
 
   useEffect(() => {
     if (!roomId) return;
-    clientRef.current = createChatClient({
-      roomId,
-      onConnected: () => setConnected(true),
-      onMessage: (payload) => {
-        const msg = {
-          sender: payload?.sender || 'Equipo',
-          content: payload?.data?.content ?? payload?.content ?? '',
-          ts: payload?.timestamp || Date.now(),
-        };
-        setMessages((prev) => [...prev, msg]);
-      },
-      onError: () => setConnected(false),
-    });
-    clientRef.current.connect();
+    (async () => {
+      clientRef.current = await createChatClient({
+        roomId,
+        onConnected: () => setConnected(true),
+        onMessage: (payload) => {
+          const msg = {
+            sender: payload?.sender || 'Equipo',
+            content: payload?.data?.content ?? payload?.content ?? '',
+            ts: payload?.timestamp || Date.now(),
+          };
+          setMessages((prev) => [...prev, msg]);
+        },
+        onError: () => setConnected(false),
+      });
+      clientRef.current.connect();
+    })();
     return () => clientRef.current?.disconnect();
   }, [roomId]);
 

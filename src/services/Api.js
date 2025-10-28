@@ -1,4 +1,5 @@
-const API = "http://localhost:8081"; // AJUSTA si tu login usa otro
+import { HTTP_BASE } from "./base.js";
+const API = HTTP_BASE;
 
 export function makeUrl(path) {
   // path siempre debe comenzar con "/"
@@ -30,10 +31,12 @@ async function safeText(res) {
 }
 
 export function authHeaders(extra = {}) {
-  return {
-    Authorization: "Bearer " + getToken(),
-    ...extra,
-  };
+  const token = getToken();
+  const headers = { ...extra };
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
 }
 
 const handleAuthFailure = async (res, path) => {
@@ -58,106 +61,151 @@ const handleAuthFailure = async (res, path) => {
 
 // 🔹 LOGIN: obtiene el token y lo guarda (lanza error legible en 401/403)
 export async function login(username, password) {
-  const r = await fetch(makeUrl("/api/auth/login"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-     body: JSON.stringify({ username, password }),
-  });
+  try {
+    const r = await fetch(makeUrl("/api/auth/login"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+       body: JSON.stringify({ username, password }),
+    });
 
-  const body = await safeJson(r);
-  if (!r.ok) {
-    const fallback = await safeText(r);
-    const err = new Error(
-      (body && (body.error || body.message)) || fallback || "Login failed"
-    );
-    err.status = r.status;
-    err.data = body;
+    const body = await safeJson(r);
+    if (!r.ok) {
+      const fallback = await safeText(r);
+      let message = "Login failed";
+      if (r.status === 401) message = "Credenciales inválidas.";
+      else if (r.status === 403) message = "Acceso no autorizado (403).";
+      else message = (body && (body.error || body.message)) || fallback || "Login failed";
+      const err = new Error(message);
+      err.status = r.status;
+      err.data = body;
+      throw err;
+    }
+
+    return body;
+  } catch (err) {
+    if (err.message === "Failed to fetch") {
+      err.message = "No se pudo conectar con el servidor (revisa que el backend esté en 8081).";
+    }
     throw err;
   }
-
-  return body;
 }
 
 // 🔹 GET genérico con autorización (Bearer)
 export async function apiGet(path) {
-  const r = await fetch(makeUrl(path), {
-    headers: authHeaders(),
-  });
+  try {
+    const r = await fetch(makeUrl(path), {
+      headers: authHeaders(),
+    });
 
-  const body = await safeJson(r);
-  if (!r.ok) {
-    if (await handleAuthFailure(r, path)) return;
-    const fallback = await safeText(r);
-    const err = new Error(
-      (body && (body.error || body.message)) || fallback || "Request failed"
-    );
-    err.status = r.status;
-    err.data = body;
+    const body = await safeJson(r);
+    if (!r.ok) {
+      if (await handleAuthFailure(r, path)) return;
+      const fallback = await safeText(r);
+      let message = "Request failed";
+      if (r.status === 401) message = "Credenciales inválidas.";
+      else if (r.status === 403) message = "Acceso no autorizado (403).";
+      else message = (body && (body.error || body.message)) || fallback || "Request failed";
+      const err = new Error(message);
+      err.status = r.status;
+      err.data = body;
+      throw err;
+    }
+    return body;
+  } catch (err) {
+    if (err.message === "Failed to fetch") {
+      err.message = "No se pudo conectar con el servidor (revisa que el backend esté en 8081).";
+    }
     throw err;
   }
-  return body;
 }
 
 // 🔹 POST genérico con autorización
 async function apiPost(path, data) {
-  const r = await fetch(makeUrl(path), {
-    method: "POST",
-    headers: authHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify(data || {}),
-  });
-  const body = await safeJson(r);
-  if (!r.ok) {
-    if (await handleAuthFailure(r, path)) return;
-    const fallback = await safeText(r);
-    const err = new Error(
-      (body && (body.error || body.message)) || fallback || "Request failed"
-    );
-    err.status = r.status;
-    err.data = body;
+  try {
+    const r = await fetch(makeUrl(path), {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify(data || {}),
+    });
+    const body = await safeJson(r);
+    if (!r.ok) {
+      if (await handleAuthFailure(r, path)) return;
+      const fallback = await safeText(r);
+      let message = "Request failed";
+      if (r.status === 401) message = "Credenciales inválidas.";
+      else if (r.status === 403) message = "Acceso no autorizado (403).";
+      else message = (body && (body.error || body.message)) || fallback || "Request failed";
+      const err = new Error(message);
+      err.status = r.status;
+      err.data = body;
+      throw err;
+    }
+    return body;
+  } catch (err) {
+    if (err.message === "Failed to fetch") {
+      err.message = "No se pudo conectar con el servidor (revisa que el backend esté en 8081).";
+    }
     throw err;
   }
-  return body;
 }
 
 // 🔹 PUT genérico con autorización
 async function apiPut(path, data) {
-  const r = await fetch(makeUrl(path), {
-    method: "PUT",
-    headers: authHeaders({ "Content-Type": "application/json" }),
-    body: JSON.stringify(data || {}),
-  });
-  const body = await safeJson(r);
-  if (!r.ok) {
-    if (await handleAuthFailure(r, path)) return;
-    const fallback = await safeText(r);
-    const err = new Error(
-      (body && (body.error || body.message)) || fallback || "Request failed"
-    );
-    err.status = r.status;
-    err.data = body;
+  try {
+    const r = await fetch(makeUrl(path), {
+      method: "PUT",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify(data || {}),
+    });
+    const body = await safeJson(r);
+    if (!r.ok) {
+      if (await handleAuthFailure(r, path)) return;
+      const fallback = await safeText(r);
+      let message = "Request failed";
+      if (r.status === 401) message = "Credenciales inválidas.";
+      else if (r.status === 403) message = "Acceso no autorizado (403).";
+      else message = (body && (body.error || body.message)) || fallback || "Request failed";
+      const err = new Error(message);
+      err.status = r.status;
+      err.data = body;
+      throw err;
+    }
+    return body;
+  } catch (err) {
+    if (err.message === "Failed to fetch") {
+      err.message = "No se pudo conectar con el servidor (revisa que el backend esté en 8081).";
+    }
     throw err;
   }
-  return body;
 }
 
 // 🔹 DELETE genérico con autorización
 async function apiDelete(path) {
-  const r = await fetch(makeUrl(path), {
-    method: "DELETE",
-    headers: authHeaders(),
-  });
-  if (!r.ok) {
-    if (await handleAuthFailure(r, path)) return;
-    const body = await safeJson(r);
-    const fallback = await safeText(r);
-    const err = new Error(
-      (body && (body.error || body.message)) || fallback || "Request failed"
-    );
-    err.status = r.status;
-    err.data = body;
+  try {
+    const r = await fetch(makeUrl(path), {
+      method: "DELETE",
+      headers: authHeaders(),
+    });
+    if (!r.ok) {
+      if (await handleAuthFailure(r, path)) return;
+      const body = await safeJson(r);
+      const fallback = await safeText(r);
+      let message = "Request failed";
+      if (r.status === 401) message = "Credenciales inválidas.";
+      else if (r.status === 403) message = "Acceso no autorizado (403).";
+      else message = (body && (body.error || body.message)) || fallback || "Request failed";
+      const err = new Error(message);
+      err.status = r.status;
+      err.data = body;
+      throw err;
+    }
+    return true;
+  } catch (err) {
+    if (err.message === "Failed to fetch") {
+      err.message = "No se pudo conectar con el servidor (revisa que el backend esté en 8081).";
+    }
     throw err;
   }
-  return true;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -206,23 +254,32 @@ export function deleteTask(roomId, taskId) {
 
 // 🔹 REGISTER: crear usuario nuevo
 export async function register(name, username, password) {
-  const r = await fetch(makeUrl("/api/users/signup-user"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-     body: JSON.stringify({ name, username, password }),
-  });
+  try {
+    const r = await fetch(makeUrl("/api/users/signup-user"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+       body: JSON.stringify({ name, username, password }),
+    });
 
-  const body = await safeJson(r);
-  if (!r.ok) {
-    const fallback = await safeText(r);
-    const err = new Error(
-      (body && (body.error || body.message)) || fallback || "Register failed"
-    );
-    err.status = r.status;
-    err.data = body;
+    const body = await safeJson(r);
+    if (!r.ok) {
+      const fallback = await safeText(r);
+      let message = "Register failed";
+      if (r.status === 401) message = "Credenciales inválidas.";
+      else if (r.status === 403) message = "Acceso no autorizado (403).";
+      else message = (body && (body.error || body.message)) || fallback || "Register failed";
+      const err = new Error(message);
+      err.status = r.status;
+      err.data = body;
+      throw err;
+    }
+    return body;
+  } catch (err) {
+    if (err.message === "Failed to fetch") {
+      err.message = "No se pudo conectar con el servidor (revisa que el backend esté en 8081).";
+    }
     throw err;
   }
-  return body;
 }
 // ✅ Eliminar sala
 export function deleteRoom(roomId) {
@@ -246,21 +303,30 @@ export function searchUser(username) {
 
 // ✅ Obtener usuario por username (para prellenar modal)
 export async function getUserByUsername(username) {
-  const r = await fetch(makeUrl(`/api/users/searchUser/${encodeURIComponent(username)}`), {
-    headers: authHeaders(),
-  });
-  const body = await safeJson(r);
-  if (!r.ok) {
-    if (await handleAuthFailure(r)) return;
-    const fallback = await safeText(r);
-    const err = new Error(
-      (body && (body.error || body.message)) || fallback || "Request failed"
-    );
-    err.status = r.status;
-    err.data = body;
+  try {
+    const r = await fetch(makeUrl(`/api/users/searchUser/${encodeURIComponent(username)}`), {
+      headers: authHeaders(),
+    });
+    const body = await safeJson(r);
+    if (!r.ok) {
+      if (await handleAuthFailure(r)) return;
+      const fallback = await safeText(r);
+      let message = "Request failed";
+      if (r.status === 401) message = "Credenciales inválidas.";
+      else if (r.status === 403) message = "Acceso no autorizado (403).";
+      else message = (body && (body.error || body.message)) || fallback || "Request failed";
+      const err = new Error(message);
+      err.status = r.status;
+      err.data = body;
+      throw err;
+    }
+    return body;
+  } catch (err) {
+    if (err.message === "Failed to fetch") {
+      err.message = "No se pudo conectar con el servidor (revisa que el backend esté en 8081).";
+    }
     throw err;
   }
-  return body;
 }
 
 // ✅ Actualizar rol de miembro

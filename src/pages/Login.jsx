@@ -6,16 +6,7 @@ import AuthForm from "../components/AuthForm";
 import { login } from "../services/api";
 import "./login.css";
 
-function normalizeMsg(s) {
-  try {
-    return String(s || "")
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase();
-  } catch {
-    return String(s || "").toLowerCase();
-  }
-}
+
 
 export default function Login() {
   const [form, setForm] = useState({ username: "", password: "" });
@@ -57,36 +48,9 @@ export default function Login() {
       localStorage.setItem("username", data.user?.username || form.username);
       localStorage.setItem("name", data.user?.name || "");
       navigate("/dashboard"); // ⬅️ al dashboard
-    } catch (err) {
-      const status =
-        err?.status || err?.response?.status;
-
-      const apiMsgRaw =
-        (err?.data && (err.data.error || err.data.message)) ||
-        (err?.response?.data && (err.response.data.error || err.response.data.message)) ||
-        err?.message || "";
-
-      const m = normalizeMsg(apiMsgRaw);
-
-      let text;
-      if (status === 404) {
-        text = "Usuario no encontrado.";
-      } else if (status === 401 || status === 403) {
-        if (m.includes("usuario no encontrado") || m.includes("usuario incorrecto")) {
-          text = "Usuario no encontrado.";
-        } else if (m.includes("contrasena incorrecta") || m.includes("contraseña incorrecta") || m.includes("password")) {
-          text = "Contraseña incorrecta.";
-        } else {
-          text = "Usuario o contraseña incorrectos.";
-        }
-      } else if (status >= 500) {
-        text = apiMsgRaw || "Error en el servidor. Intenta más tarde.";
-      } else {
-        text = apiMsgRaw || "No se pudo obtener la sesión.";
-      }
-
-      setMessage({ type: "error", text });
-    } finally {
+      } catch (err) {
+        setMessage({ type: "error", text: err.message });
+      } finally {
       setLoading(false);
     }
   }
