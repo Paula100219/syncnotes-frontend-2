@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { createChatClient } from '../services/chatSocket';
+import { socket } from '../services/chatSocket';
 import { getCurrentName } from '../services/helpers';
+
+
 
 export default function ChatBox({ roomId }) {
   const [messages, setMessages] = useState([]);
@@ -11,23 +13,42 @@ export default function ChatBox({ roomId }) {
 
   useEffect(() => {
     if (!roomId) return;
-    (async () => {
-      clientRef.current = await createChatClient({
-        roomId,
-        onConnected: () => setConnected(true),
-        onMessage: (payload) => {
-          const msg = {
-            sender: payload?.sender || 'Equipo',
-            content: payload?.data?.content ?? payload?.content ?? '',
-            ts: payload?.timestamp || Date.now(),
-          };
-          setMessages((prev) => [...prev, msg]);
-        },
-        onError: () => setConnected(false),
-      });
-      clientRef.current.connect();
-    })();
-    return () => clientRef.current?.disconnect();
+    let isMounted = true;
+    async function fetchMessages() {
+      try {
+        const response = await fetch(`http://localhost:8081/api/rooms/${roomId}/messages`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          console.log("Historial cargado:", data); // para verificar en consola
+          setMessages(data.map(msg => ({ ...msg, sender: msg.senderName || 'Equipo' })));
+        } else {
+          console.error(" Error al cargar mensajes:", response.statusText);
+        }
+      } catch (error) {
+        console.error(" Error al obtener mensajes:", error);
+      }
+    }
+    // Limpiar mensajes previos antes de recargar
+    setMessages([]);
+    // Cargar historial del backend
+    fetchMessages();
+    // 3 Conectar el socket
+    socket.emit("join_room", roomId);
+    socket.on("connect", () => setConnected(true));
+    socket.on("disconnect", () => setConnected(false));
+    // 4 Escuchar mensajes nuevos
+    socket.on("receive_message", (message) => {
+      setMessages((prev) => [...prev, message]);
+    });
+    // 5 Cleanup al salir
+    return () => {
+      isMounted = false;
+      socket.off("receive_message");
+      socket.off("connect");
+      socket.off("disconnect");
+    };
   }, [roomId]);
 
   useEffect(() => {
@@ -38,7 +59,7 @@ export default function ChatBox({ roomId }) {
     e.preventDefault();
     const msg = text.trim();
     if (!msg) return;
-    clientRef.current?.sendChat(msg);
+    socket.emit("send_chat", msg);
     setMessages((prev) => [
       ...prev,
       { sender: getCurrentName() || 'Tú', content: msg, ts: Date.now(), self: true },

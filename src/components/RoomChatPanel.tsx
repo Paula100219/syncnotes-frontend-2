@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { chatService } from "../services/ChatService";
+import { getRoomMessages } from "../services/Api";
 import "./room-chat.css";
 
 interface RoomChatPanelProps {
@@ -31,6 +32,22 @@ export default function RoomChatPanel({ roomId, currentUsername }: RoomChatPanel
       chatService.disconnect();
     };
   }, [roomId]);
+
+  useEffect(() => {
+    const fetchMessages = async () => {
+      try {
+        const data = await getRoomMessages(roomId);
+        if (mounted.current) {
+          setMessages(data.map((msg: any) => ({ ...msg, mine: msg.username === currentUsername })));
+        }
+      } catch (error) {
+        console.error("Error al cargar mensajes:", error);
+      }
+    };
+    if (roomId) {
+      fetchMessages();
+    }
+  }, [roomId, currentUsername]);
 
   // autoscroll suave cuando llegan mensajes
   useEffect(() => {
